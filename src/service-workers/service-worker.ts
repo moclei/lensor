@@ -1,4 +1,4 @@
-import tabWatch, {getTabs} from './tabs/tabs-manager';
+import tabWatch, { getTabs } from './tabs/tabs-manager';
 
 console.log("lensor service worker created! version: ", chrome.runtime.getManifest().version);
 tabWatch();
@@ -45,43 +45,27 @@ chrome.action.onClicked.addListener(async (tab) => {
     const existingContexts = await chrome.runtime.getContexts({});
     console.log('existing contexts: ', existingContexts);
     let storage = await chrome.storage.local.get('recording');
-    const recording =  storage.recording || false;
+    const recording = storage.recording || false;
     console.log('recording?: ', recording);
-    // const offscreenDocument = existingContexts.find(
-    //   (c) => c.contextType === 'OFFSCREEN_DOCUMENT'
-    // );
-  
-    // If an offscreen document is not already open, create one.
-    // if (!offscreenDocument) {
-    //   // Create an offscreen document.
-    //   await chrome.offscreen.createDocument({
-    //     url: 'offscreen.html',
-    //     reasons: ['USER_MEDIA'],
-    //     justification: 'Recording from chrome.tabCapture API'
-    //   });
-    // } else {
-    //   recording = offscreenDocument.documentUrl.endsWith('#recording');
-    // }
-
     if (recording) {
         console.log('sending stop-recording message');
-      chrome.tabs.sendMessage(tab.id!, {
-        type: 'stop-recording',
-      });
-      return;
+        chrome.tabs.sendMessage(tab.id!, {
+            type: 'stop-recording',
+        });
+        return;
     }
-  
+
     console.log('Getting streamId');
     // Get a MediaStream for the active tab.
-    const streamId = await chrome.tabCapture.getMediaStreamId({
+    const streamId = await (chrome.tabCapture as any).getMediaStreamId({
         consumerTabId: tab.id,
         targetTabId: tab.id
     });
     console.log('streamId: ', streamId);
     // Send the stream ID to the offscreen document to start recording.
     chrome.tabs.sendMessage(tab.id!, {
-      type: 'start-recording',
-      data: streamId
+        type: 'start-recording',
+        data: streamId
     });
     console.log('sent start-recording');
-  });
+});

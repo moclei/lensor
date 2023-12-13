@@ -16,13 +16,14 @@ chrome.runtime.onMessage.addListener(async (message) => {
 });
 
 const BORDER_COLOR = 'rgb(87, 102, 111)';
-const CANVAS_SIZE = 300;
+const CANVAS_SIZE = 400;
 const ZOOM = 6;
 
 type LensorState = {
     media: void | MediaStream | null,
     mouseX: number,
     mouseY: number,
+    prevCoords: { x: number, y: number },
     videoElement: HTMLVideoElement | null,
     ctx: CanvasRenderingContext2D | null,
     canvas: HTMLCanvasElement | null,
@@ -33,12 +34,14 @@ type LensorState = {
     offscreenCtx: CanvasRenderingContext2D | null,
     offscreenCanvas: HTMLCanvasElement | null,
     initialized: boolean,
-    scale: number
+    scale: number,
+    selectedPixelColor: string | null
 }
 const state: LensorState = {
     media: null,
     mouseX: 0,
     mouseY: 0,
+    prevCoords: { x: 0, y: 0 },
     videoElement: null,
     ctx: null,
     canvas: null,
@@ -49,7 +52,8 @@ const state: LensorState = {
     offscreenCtx: null,
     offscreenCanvas: null,
     initialized: false,
-    scale: 1
+    scale: 1,
+    selectedPixelColor: null
 }
 
 interactions.registerIxnListeners({
@@ -166,8 +170,22 @@ function updateCanvas() {
         const cropY = (mouseY * scale) - canvasYAdjust;
 
         ctx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / ZOOM, CANVAS_SIZE / ZOOM, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+        updateSelectedPixel();
     }
     requestAnimationFrame(updateCanvas);
+}
+
+function updateSelectedPixel() {
+    const { prevCoords, mouseX, mouseY } = state;
+    if (mouseX !== prevCoords.x || mouseY !== prevCoords.y) {
+        state.prevCoords = { x: mouseX, y: mouseY };
+        const pixel = state.ctx!.getImageData(CANVAS_SIZE / 2, CANVAS_SIZE / 2, 1, 1);
+        const rgb = `rgb(${pixel.data[0]}, ${pixel.data[1]}, ${pixel.data[2]})`;
+        console.log("updating pixel color: ", rgb);
+        state.selectedPixelColor = rgb;
+        state.canvas!.style.border = `8px solid ${rgb}`;
+    }
 }
 
 function createMainCanvas() {
