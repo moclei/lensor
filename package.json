@@ -1,0 +1,37 @@
+{
+  "name": "lensor",
+  "version": "1.0.0",
+  "description": "Web extension for port and zooming",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint 'src/**/*.{js,ts}'",
+    "format": "prettier --write 'src/**/*.{js,ts,html,css}'",
+    "build": "node ./build.mjs"
+  },
+  "keywords": [
+    "web-extensions",
+    "node",
+    "javascript",
+    "typescript"
+  ],
+  "author": "Marc O'Cleirig",
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "esbuild": "^0.19.9"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.254",
+    "@types/d3": "^7.4.3",
+    "@typescript-eslint/eslint-plugin": "^6.13.2",
+    "@typescript-eslint/parser": "^6.13.2",
+    "d3": "^7.8.5",
+    "d3-fisheye": "^2.1.2",
+    "eslint": "^8.55.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.3"
+  }
+}
