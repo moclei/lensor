@@ -1,3 +1,5 @@
+import tabsManager from "../service-workers/tabs/tabs-manager";
+import { assignCanvasProps } from "./canvas-utils";
 import { makeDraggable } from "./draggable";
 import interactions from "./user-interactions";
 
@@ -6,6 +8,7 @@ chrome.runtime.onMessage.addListener(async (message) => {
     switch (message.type) {
         case 'start-recording':
             startRecording(message.data);
+            state.myTabId = message.tabId;
             break;
         case 'stop-recording':
             stopRecording();
@@ -17,43 +20,97 @@ chrome.runtime.onMessage.addListener(async (message) => {
 
 const BORDER_COLOR = 'rgb(87, 102, 111)';
 const CANVAS_SIZE = 400;
-const ZOOM = 6;
+
+const InfoCanvasProps = {
+    width: 80,
+    height: 40,
+    style: {
+        position: 'fixed',
+        zIndex: '9999999',
+        backgroundColor: 'lightyellow',
+        right: '10px',
+        top: '410px',
+        borderRadius: '6px',
+        border: `0px`,
+        overflow: 'hidden',
+        boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+        display: 'none'
+    }
+}
+
+const MainCanvasProps = {
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    style: {
+        position: 'fixed',
+        zIndex: '9999998',
+        right: '10px',
+        top: '10px',
+        borderRadius: '50%',
+        border: `8px solid ${BORDER_COLOR}`,
+        overflow: 'hidden',
+        boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+        imageRendering: 'pixelated',
+        display: 'none'
+    }
+}
+
+const GridCanvasProps = {
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    style: {
+        position: 'fixed',
+        zIndex: '9999999',
+        right: '18px',
+        top: '18px',
+        borderRadius: '50%',
+        overflow: 'hidden',
+        display: 'none'
+    }
+}
 
 type LensorState = {
     media: void | MediaStream | null,
     mouseX: number,
     mouseY: number,
+    zoom: number,
     prevCoords: { x: number, y: number },
     videoElement: HTMLVideoElement | null,
     ctx: CanvasRenderingContext2D | null,
     canvas: HTMLCanvasElement | null,
+    canvases: HTMLCanvasElement[],
     gridCtx: CanvasRenderingContext2D | null,
     gridCanvas: HTMLCanvasElement | null,
-    dragCanvas: HTMLCanvasElement | null,
-    dragCtx: CanvasRenderingContext2D | null,
+    infoCanvas: HTMLCanvasElement | null,
+    infoCtx: CanvasRenderingContext2D | null,
     offscreenCtx: CanvasRenderingContext2D | null,
     offscreenCanvas: HTMLCanvasElement | null,
     initialized: boolean,
     scale: number,
-    selectedPixelColor: string | null
+    selectedPixelColor: string | null,
+    myTabId: number | null
 }
+
 const state: LensorState = {
     media: null,
     mouseX: 0,
     mouseY: 0,
+    zoom: 2,
     prevCoords: { x: 0, y: 0 },
     videoElement: null,
     ctx: null,
     canvas: null,
+    canvases: [],
     gridCtx: null,
     gridCanvas: null,
-    dragCtx: null,
-    dragCanvas: null,
+    infoCtx: null,
+    infoCanvas: null,
     offscreenCtx: null,
     offscreenCanvas: null,
     initialized: false,
     scale: 1,
-    selectedPixelColor: null
+    selectedPixelColor: null,
+    myTabId: null
 }
 
 interactions.registerIxnListeners({
@@ -63,6 +120,11 @@ interactions.registerIxnListeners({
     handleMove: (coords: { x: number, y: number }) => {
         state.mouseX = coords.x;
         state.mouseY = coords.y;
+    },
+    handleZoom: (change: number) => {
+        state.zoom += change;
+        if (state.zoom < 1) state.zoom = 1;
+        if (state.zoom > 6) state.zoom = 6;
     }
 });
 
@@ -76,7 +138,7 @@ function createAndStartVideoElement(media: MediaStream) {
         // const videoHeight = videoElement.videoHeight;
         state.scale = videoWidth / window.innerWidth;
         // scaleY = videoHeight / window.innerHeight;
-        drawGrid(state.scale * ZOOM);
+        drawGrid(state.scale * state.zoom);
 
     });
 
@@ -90,20 +152,23 @@ function createAndStartVideoElement(media: MediaStream) {
     // Set the stream as the source for the video element
     videoElement.srcObject = media;
     videoElement.play();
-    videoElement.oncanplay = () => {
-        console.log('onCanPlay');
-        const { ctx, videoElement, offscreenCtx, offscreenCanvas, media } = state;
-        if (!ctx || !videoElement || !offscreenCtx || !offscreenCanvas) return;
+    videoElement.oncanplay = onRecordingStarted;
+}
 
-        offscreenCanvas.height = videoElement.videoHeight;
-        offscreenCanvas.width = videoElement.videoWidth;
-        offscreenCtx.drawImage(videoElement, 0, 0, videoElement.videoWidth, videoElement.videoHeight, 0, 0, videoElement.videoWidth, videoElement.videoHeight);
-        // saveAsPNG(offscreenCanvas);
-        state.initialized = true;
-        updateCanvas();
-        media!.getVideoTracks()[0].stop();
-        showCanvases();
-    }
+function onRecordingStarted() {
+    console.log('onRecordingStarted');
+    const { ctx, videoElement, offscreenCtx, offscreenCanvas, media } = state;
+    if (!ctx || !videoElement || !offscreenCtx || !offscreenCanvas) return;
+
+    const cropRegion = cropImage(videoElement.videoWidth, videoElement.videoHeight, window.innerWidth, window.innerHeight);
+
+    offscreenCanvas.height = videoElement.videoHeight;
+    offscreenCanvas.width = videoElement.videoWidth;
+    offscreenCtx.drawImage(videoElement, cropRegion.x, cropRegion.y, cropRegion.width, cropRegion.height, 0, 0, cropRegion.width, cropRegion.height);
+    state.initialized = true;
+    updateCanvas();
+    media!.getVideoTracks()[0].stop();
+    showCanvases();
 }
 
 async function startRecording(streamId: string) {
@@ -123,18 +188,19 @@ async function startRecording(streamId: string) {
     }
     if (!state.media) return;
     createMainCanvas();
+    createInfoCanvas();
     createGridCanvas();
     createOffscreenCanvas();
     createAndStartVideoElement(state.media);
     interactions.startIxn();
-    makeDraggable(state.canvas!, [state.gridCanvas!], 8);
-    chrome.storage.local.set({ recording: true });
+    makeDraggable(state.canvas!, [state.gridCanvas!, state.infoCanvas!], 8);
+    tabsManager.setTabRecording(state.myTabId!, true);
 }
 
 async function stopRecording() {
     console.log('stopRecording');
     const { canvas, ctx, gridCtx, gridCanvas, videoElement, media } = state;
-    chrome.storage.local.set({ recording: false });
+    tabsManager.setTabRecording(state.myTabId!, false);
     media!.getVideoTracks()[0].stop();
     !!videoElement && videoElement.remove();
     state.videoElement = null;
@@ -163,13 +229,13 @@ function updateCanvas() {
     if (initialized) {
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-        const canvasXAdjust = 28;
-        const canvasYAdjust = 9;
+        const canvasXAdjust = CANVAS_SIZE / (state.zoom * 2);
+        const canvasYAdjust = CANVAS_SIZE / (state.zoom * 2);
 
         const cropX = (mouseX * scale) - canvasXAdjust;
         const cropY = (mouseY * scale) - canvasYAdjust;
 
-        ctx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / ZOOM, CANVAS_SIZE / ZOOM, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        ctx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / state.zoom, CANVAS_SIZE / state.zoom, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
         updateSelectedPixel();
     }
@@ -182,7 +248,6 @@ function updateSelectedPixel() {
         state.prevCoords = { x: mouseX, y: mouseY };
         const pixel = state.ctx!.getImageData(CANVAS_SIZE / 2, CANVAS_SIZE / 2, 1, 1);
         const rgb = `rgb(${pixel.data[0]}, ${pixel.data[1]}, ${pixel.data[2]})`;
-        console.log("updating pixel color: ", rgb);
         state.selectedPixelColor = rgb;
         state.canvas!.style.border = `8px solid ${rgb}`;
     }
@@ -190,44 +255,35 @@ function updateSelectedPixel() {
 
 function createMainCanvas() {
     const canvas = document.createElement('canvas');
-    canvas.width = CANVAS_SIZE;
-    canvas.height = CANVAS_SIZE;
-    canvas.style.position = 'fixed';
-    canvas.style.zIndex = '9999998';
-    // canvas.style.pointerEvents = 'none';
-    canvas.style.right = `10px`;
-    canvas.style.top = `10px`;
-    canvas.style.borderRadius = '50%';
-    canvas.style.border = `8px solid ${BORDER_COLOR}`;
-    canvas.style.overflow = 'hidden';
-    canvas.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.5)';
-    canvas.style.imageRendering = 'pixelated';
-    canvas.style.display = 'none';
+    assignCanvasProps(canvas, MainCanvasProps);
     document.body.appendChild(canvas);
     state.ctx = canvas.getContext('2d');
     state.canvas = canvas;
+    state.canvases.push(canvas);
+}
+
+function createInfoCanvas() {
+    const infoCanvas = document.createElement('canvas');
+    assignCanvasProps(infoCanvas, InfoCanvasProps);
+    document.body.appendChild(infoCanvas);
+    state.infoCtx = infoCanvas.getContext('2d');
+    state.infoCanvas = infoCanvas;
+    state.canvases.push(infoCanvas);
 }
 
 function createGridCanvas() {
     const gridCanvas = document.createElement('canvas');
-    gridCanvas.width = CANVAS_SIZE;
-    gridCanvas.height = CANVAS_SIZE;
-    gridCanvas.style.position = 'fixed';
-    gridCanvas.style.zIndex = '9999999';
-    gridCanvas.style.pointerEvents = 'none'; // To allow clicking 'through' the canvas
-    gridCanvas.style.right = `18px`;
-    gridCanvas.style.top = `18px`;
-    gridCanvas.style.borderRadius = '50%';
-    gridCanvas.style.overflow = 'hidden';
-    gridCanvas.style.display = 'none';
+    assignCanvasProps(gridCanvas, GridCanvasProps);
     document.body.appendChild(gridCanvas);
     state.gridCanvas = gridCanvas;
     state.gridCtx = gridCanvas.getContext('2d');
+    state.canvases.push(gridCanvas);
 }
 
 function showCanvases() {
-    state.gridCanvas!.style.display = 'block';
-    state.canvas!.style.display = 'block';
+    for (let canvas of state.canvases) {
+        canvas!.style.display = 'block';
+    }
 }
 
 function createOffscreenCanvas() {
@@ -248,13 +304,13 @@ function drawGrid(spacing: number) {
     gridCtx.lineWidth = .5;
     gridCtx.beginPath();
 
-    // Draw vertical lines
+    // Vertical lines
     for (let x = 0; x <= gridCanvas.width; x += spacing) {
         gridCtx.moveTo(x, 0);
         gridCtx.lineTo(x, gridCanvas.height);
     }
 
-    // Draw horizontal lines
+    // Horizontal lines
     for (let y = 0; y <= gridCanvas.height; y += spacing) {
         gridCtx.moveTo(0, y);
         gridCtx.lineTo(gridCanvas.width, y);
@@ -268,9 +324,53 @@ function saveAsPNG(canvas: HTMLCanvasElement) {
 
     const downloadLink = document.createElement('a');
     downloadLink.href = dataURL;
-    downloadLink.download = 'canvas-image.png';
+    const formattedDate = formatDateTime(new Date());
+    downloadLink.download = `canvas-image-${formattedDate}.png`;
 
     document.body.appendChild(downloadLink);
     downloadLink.click();
     document.body.removeChild(downloadLink);
+}
+
+function formatDateTime(date: Date): string {
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${month}-${day}_${hours}-${minutes}`;
+}
+
+function cropImage
+    (canvasWidth: number,
+        canvasHeight: number,
+        windowWidth: number,
+        windowHeight: number
+    ): { x: number, y: number, width: number, height: number } {
+
+    console.log(`Crop image, canvasWidth: ${canvasWidth}, canvasHeight: ${canvasHeight}, windowWidth: ${windowWidth}, windowHeight: ${windowHeight}`)
+    let scaleFactor, newWidth, newHeight;
+
+    // Determine the dominant dimension
+    if (windowWidth >= windowHeight) {
+        // Width is dominant
+        scaleFactor = canvasWidth / windowWidth;
+        newWidth = canvasWidth;
+        newHeight = windowHeight * scaleFactor;
+    } else {
+        // Height is dominant
+        scaleFactor = canvasHeight / windowHeight;
+        newHeight = canvasHeight;
+        newWidth = windowWidth * scaleFactor;
+    }
+
+    // Calculate crop region
+    const cropX = (canvasWidth - newWidth) / 2;
+    const cropY = (canvasHeight - newHeight) / 2;
+
+    return {
+        x: cropX,
+        y: cropY,
+        width: newWidth,
+        height: newHeight
+    };
 }

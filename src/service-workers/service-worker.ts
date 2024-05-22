@@ -1,7 +1,15 @@
-import tabWatch, { getTabs } from './tabs/tabs-manager';
+import tabsMan from './tabs/tabs-manager';
+import { create, Partition } from 'weirwood';
 
 console.log("lensor service worker created! version: ", chrome.runtime.getManifest().version);
-tabWatch();
+tabsMan.initialize();
+
+const weirwood = create({
+    active: {
+        default: false,
+        partition: Partition.Instance
+    },
+})
 
 chrome.runtime.onMessage.addListener(async (message) => {
     console.log('Message heard in service worker: ', message);
@@ -11,7 +19,6 @@ chrome.runtime.onStartup.addListener(() => {
 });
 chrome.runtime.onSuspend.addListener(() => {
     console.log("Unloading extension, saving state.");
-    // Perform cleanup or save tasks
 });
 chrome.runtime.onSuspendCanceled.addListener(() => {
     console.log("Extension unload canceled, continuing operations.");
@@ -27,45 +34,50 @@ chrome.runtime.onInstalled.addListener(async (details: chrome.runtime.InstalledD
     } else if (details.reason === "update") {
         console.log(`Extension updated to version ${details.previousVersion}`);
     }
-    const currentTabs = await getTabs();
+    const currentTabs = await tabsMan.getTabs();
     console.log('onInstalled, currentTabs: ', currentTabs);
     for (const tab of currentTabs) {
         console.log('onInstalled, reloading tab: ', tab);
-        chrome.tabs.reload(tab).then(() => {
+        chrome.tabs.reload(tab[0]).then(() => {
             if (chrome.runtime.lastError) {
-                console.log("Error reloading tab(", tab, "), lastError: ", chrome.runtime.lastError);
+                console.log("Error reloading tab(", tab[0], "), lastError: ", chrome.runtime.lastError);
             } else {
-                console.log("Reloaded tab ", tab);
+                console.log("Reloaded tab ", tab[0]);
             }
         });
     }
 });
 
 chrome.action.onClicked.addListener(async (tab) => {
-    const existingContexts = await chrome.runtime.getContexts({});
-    console.log('existing contexts: ', existingContexts);
-    let storage = await chrome.storage.local.get('recording');
-    const recording = storage.recording || false;
-    console.log('recording?: ', recording);
+    // let storage = await chrome.storage.local.get('recording');
+    const { active } = weirwood.get(tab.id!);
+    weirwood.set({ active: !active }, tab.id!);
+    let tabMap = await tabsMan.getTabs();
+    let recording = false;
+    if (tab.id && tabMap.has(tab.id)) {
+        console.log("had tabId, getting recording status");
+        recording = tabMap.get(tab.id) || false;
+
+        console.log("recording status was " + recording);
+    } else {
+        console.log("no tabId, setting recording status to false");
+    }
+
     if (recording) {
-        console.log('sending stop-recording message');
         chrome.tabs.sendMessage(tab.id!, {
             type: 'stop-recording',
         });
         return;
     }
-
-    console.log('Getting streamId');
     // Get a MediaStream for the active tab.
     const streamId = await (chrome.tabCapture as any).getMediaStreamId({
         consumerTabId: tab.id,
         targetTabId: tab.id
     });
-    console.log('streamId: ', streamId);
     // Send the stream ID to the offscreen document to start recording.
     chrome.tabs.sendMessage(tab.id!, {
         type: 'start-recording',
-        data: streamId
+        data: streamId,
+        tabId: tab.id
     });
-    console.log('sent start-recording');
 });
