@@ -1,0 +1,35 @@
+/* handle.css */
+
+#lensor-handle {
+    width: 80px;
+    height: 150px;
+    background-color: black;
+    clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%);
+    position: fixed;
+    z-index: 9999997;
+    background-color: var(--before-background-color, #3c1b07);
+    right: 95px;
+    top: 315px;
+    overflow: hidden;
+    display: none;
+    transform: rotate(-40deg);
+    transform-origin: top right;
+    cursor: pointer;
+}
+
+/* background-color: #62391c; */
+
+/*    clip-path: 'polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%)';*/
+#lensor-handle::before {
+    content: '';
+    width: 100%;
+    height: 100%;
+    background-color: #faeee3;
+    display: block;
+    position: absolute;
+    top: 5px;
+    left: 0px;
+    clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%);
+    transform: scale(0.8);
+    transform-origin: center;
+}

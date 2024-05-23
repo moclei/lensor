@@ -20,7 +20,7 @@
   "dependencies": {
     "chokidar": "^3.5.3",
     "esbuild": "^0.19.9",
-    "weirwood": "^1.0.2"
+    "weirwood": "^1.0.4"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.254",

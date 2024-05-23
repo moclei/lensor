@@ -58,6 +58,7 @@ const build = () => {
         format: 'esm'
     }).catch(() => process.exit(1));
 
+    // Copy assets
     assets.forEach(assetDir => {
         fs.readdirSync(assetDir).forEach(file => {
             const srcPath = path.join(assetDir, file);

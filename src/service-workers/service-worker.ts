@@ -1,15 +1,11 @@
+import { LensorStateConfig } from '../weirwood/state-config';
 import tabsMan from './tabs/tabs-manager';
 import { create, Partition } from 'weirwood';
 
 console.log("lensor service worker created! version: ", chrome.runtime.getManifest().version);
 tabsMan.initialize();
 
-const weirwood = create({
-    active: {
-        default: false,
-        partition: Partition.Instance
-    },
-})
+const weirwood = create(LensorStateConfig)
 
 chrome.runtime.onMessage.addListener(async (message) => {
     console.log('Message heard in service worker: ', message);
@@ -49,35 +45,21 @@ chrome.runtime.onInstalled.addListener(async (details: chrome.runtime.InstalledD
 });
 
 chrome.action.onClicked.addListener(async (tab) => {
-    // let storage = await chrome.storage.local.get('recording');
-    const { active } = weirwood.get(tab.id!);
-    weirwood.set({ active: !active }, tab.id!);
-    let tabMap = await tabsMan.getTabs();
-    let recording = false;
-    if (tab.id && tabMap.has(tab.id)) {
-        console.log("had tabId, getting recording status");
-        recording = tabMap.get(tab.id) || false;
-
-        console.log("recording status was " + recording);
-    } else {
-        console.log("no tabId, setting recording status to false");
-    }
-
-    if (recording) {
-        chrome.tabs.sendMessage(tab.id!, {
-            type: 'stop-recording',
+    console.log('Action clicked, tab: ', tab);
+    const { active, initialized } = weirwood.get(tab.id!);
+    if (!initialized) {
+        console.log('Not initialized, starting app.');
+        // Get a MediaStream for the active tab.
+        const streamId = await (chrome.tabCapture as any).getMediaStreamId({
+            consumerTabId: tab.id,
+            targetTabId: tab.id
         });
-        return;
+        // Send the stream ID to the offscreen document to start recording.
+        chrome.tabs.sendMessage(tab.id!, {
+            type: 'start-app',
+            data: streamId,
+            tabId: tab.id
+        });
     }
-    // Get a MediaStream for the active tab.
-    const streamId = await (chrome.tabCapture as any).getMediaStreamId({
-        consumerTabId: tab.id,
-        targetTabId: tab.id
-    });
-    // Send the stream ID to the offscreen document to start recording.
-    chrome.tabs.sendMessage(tab.id!, {
-        type: 'start-recording',
-        data: streamId,
-        tabId: tab.id
-    });
+
 });

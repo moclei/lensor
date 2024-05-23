@@ -1,14 +1,17 @@
+import { WeirwoodConnect, connect } from "weirwood";
 import tabsManager from "../service-workers/tabs/tabs-manager";
 import { assignCanvasProps } from "./canvas-utils";
 import { makeDraggable } from "./draggable";
 import interactions from "./user-interactions";
+import { LensorStateConfig } from "../weirwood/state-config";
 
 chrome.runtime.onMessage.addListener(async (message) => {
     console.log('runtime.onMessage, heard: ', message);
     switch (message.type) {
-        case 'start-recording':
-            startRecording(message.data);
+        case 'start-app':
             state.myTabId = message.tabId;
+            state.myStreamId = message.data;
+            initApp(message.data);
             break;
         case 'stop-recording':
             stopRecording();
@@ -21,24 +24,46 @@ chrome.runtime.onMessage.addListener(async (message) => {
 const BORDER_COLOR = 'rgb(87, 102, 111)';
 const CANVAS_SIZE = 400;
 
+// const InfoCanvasProps = {
+//     id: 'lensor-info-canvas',
+//     width: 80,
+//     height: 40,
+//     style: {
+//         position: 'fixed',
+//         zIndex: '9999997',
+//         backgroundColor: 'lightyellow',
+//         right: '10px',
+//         top: '410px',
+//         borderRadius: '6px',
+//         border: `0px`,
+//         overflow: 'hidden',
+//         boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+//         display: 'none'
+//     }
+// }
+
+
 const InfoCanvasProps = {
+    id: 'lensor-info-canvas',
     width: 80,
-    height: 40,
+    height: 150,
     style: {
         position: 'fixed',
-        zIndex: '9999999',
-        backgroundColor: 'lightyellow',
-        right: '10px',
-        top: '410px',
-        borderRadius: '6px',
-        border: `0px`,
+        zIndex: '9999997',
+        backgroundColor: '#8B4513', // Wooden color (saddle brown)
+        right: '95px',
+        top: '315px',
+        boxShadow: `inset 0 0 0 7px ${BORDER_COLOR}`,
         overflow: 'hidden',
-        boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
-        display: 'none'
-    }
-}
+        display: 'none',
+        transform: 'rotate(-40deg)', // Rotate the handle to the right at an angle
+        transformOrigin: 'top right', // Set the rotation origin to the top right corner
+        clipPath: 'polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%)', // Create a tapered shape
+    },
+};
 
 const MainCanvasProps = {
+    id: 'lensor-main-canvas',
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
     style: {
@@ -56,6 +81,7 @@ const MainCanvasProps = {
 }
 
 const GridCanvasProps = {
+    id: 'lensor-grid-canvas',
     width: CANVAS_SIZE,
     height: CANVAS_SIZE,
     style: {
@@ -78,17 +104,20 @@ type LensorState = {
     videoElement: HTMLVideoElement | null,
     ctx: CanvasRenderingContext2D | null,
     canvas: HTMLCanvasElement | null,
-    canvases: HTMLCanvasElement[],
+    canvases: HTMLElement[],
     gridCtx: CanvasRenderingContext2D | null,
     gridCanvas: HTMLCanvasElement | null,
     infoCanvas: HTMLCanvasElement | null,
+    handle: HTMLElement | null,
     infoCtx: CanvasRenderingContext2D | null,
     offscreenCtx: CanvasRenderingContext2D | null,
     offscreenCanvas: HTMLCanvasElement | null,
     initialized: boolean,
     scale: number,
     selectedPixelColor: string | null,
-    myTabId: number | null
+    myTabId: number | null,
+    weirwood: WeirwoodConnect<typeof LensorStateConfig> | null,
+    myStreamId: number | null
 }
 
 const state: LensorState = {
@@ -110,22 +139,29 @@ const state: LensorState = {
     initialized: false,
     scale: 1,
     selectedPixelColor: null,
-    myTabId: null
+    myTabId: null,
+    weirwood: null,
+    myStreamId: null,
+    handle: null
+}
+
+function handleMove(coords: { x: number, y: number }) {
+    console.log(handleMove, 'coords:', coords)
+    state.mouseX = coords.x;
+    state.mouseY = coords.y;
 }
 
 interactions.registerIxnListeners({
     handleStop: () => {
         stopRecording();
     },
-    handleMove: (coords: { x: number, y: number }) => {
-        state.mouseX = coords.x;
-        state.mouseY = coords.y;
-    },
+    handleMove,
     handleZoom: (change: number) => {
         state.zoom += change;
         if (state.zoom < 1) state.zoom = 1;
         if (state.zoom > 6) state.zoom = 6;
-    }
+    },
+    handleScroll: takeSnapshot()
 });
 
 function createAndStartVideoElement(media: MediaStream) {
@@ -139,7 +175,6 @@ function createAndStartVideoElement(media: MediaStream) {
         state.scale = videoWidth / window.innerWidth;
         // scaleY = videoHeight / window.innerHeight;
         drawGrid(state.scale * state.zoom);
-
     });
 
     videoElement.style.visibility = 'hidden';
@@ -152,11 +187,11 @@ function createAndStartVideoElement(media: MediaStream) {
     // Set the stream as the source for the video element
     videoElement.srcObject = media;
     videoElement.play();
-    videoElement.oncanplay = onRecordingStarted;
+    videoElement.oncanplay = onPlayStarted;
 }
 
-function onRecordingStarted() {
-    console.log('onRecordingStarted');
+function onPlayStarted() {
+    console.log('onPlayStarted');
     const { ctx, videoElement, offscreenCtx, offscreenCanvas, media } = state;
     if (!ctx || !videoElement || !offscreenCtx || !offscreenCanvas) return;
 
@@ -169,11 +204,38 @@ function onRecordingStarted() {
     updateCanvas();
     media!.getVideoTracks()[0].stop();
     showCanvases();
+    state.weirwood!.set({ initialized: true });
 }
 
-async function startRecording(streamId: string) {
-    console.log("startRecording, streamId:", streamId);
+async function initApp(streamId: string) {
+    console.log("initApp, streamId:", streamId);
+    if (self === top && !state.initialized) {
+        // first call to open app, initialize video, weirwodd and canvases.
+        // await initializeVideo(streamId);
+        // if (!state.media) return;
+        // createCanvases();
+
+        // subsequently we listen to weirwood state changes and update canvases accordingly.
+        const weirwood = connect(LensorStateConfig, "Content script");
+        state.weirwood = weirwood;
+        weirwood.subscribe(async (changes) => {
+            console.log('initApp weirwood subscription, changes:', changes);
+            if (!changes.active) {
+                await initializeVideo(streamId);
+                if (!state.media) return;
+                createCanvases();
+            } else if (changes.active) {
+                stopRecording();
+            }
+        }, ['active', 'initialized']);
+
+    }
+}
+
+async function initializeVideo(streamId: string) {
+    console.log("initializeVideo");
     try {
+        console.log("Trying to initialize video stream for streamId: ", streamId);
         state.media = await (navigator.mediaDevices as any).getUserMedia({
             video: {
                 mandatory: {
@@ -186,17 +248,19 @@ async function startRecording(streamId: string) {
         console.log('error starting recording: ', recordException);
         state.media = null;
     }
-    if (!state.media) return;
-    createMainCanvas();
-    createInfoCanvas();
-    createGridCanvas();
-    createOffscreenCanvas();
-    createAndStartVideoElement(state.media);
-    interactions.startIxn();
-    makeDraggable(state.canvas!, [state.gridCanvas!, state.infoCanvas!], 8);
-    tabsManager.setTabRecording(state.myTabId!, true);
 }
 
+async function createCanvases() {
+    createMainCanvas();
+    // createInfoCanvas();
+    createHandle();
+    createGridCanvas();
+    drawCrosshairs();
+    createOffscreenCanvas();
+    createAndStartVideoElement(state.media!);
+    interactions.startIxn();
+    makeDraggable(state.handle!, [state.gridCanvas!, state.canvas!], 8, handleMove);
+}
 async function stopRecording() {
     console.log('stopRecording');
     const { canvas, ctx, gridCtx, gridCanvas, videoElement, media } = state;
@@ -250,6 +314,7 @@ function updateSelectedPixel() {
         const rgb = `rgb(${pixel.data[0]}, ${pixel.data[1]}, ${pixel.data[2]})`;
         state.selectedPixelColor = rgb;
         state.canvas!.style.border = `8px solid ${rgb}`;
+        state.handle!.style.setProperty('--before-background-color', rgb);
     }
 }
 
@@ -271,6 +336,15 @@ function createInfoCanvas() {
     state.canvases.push(infoCanvas);
 }
 
+function createHandle() {
+    const handle = document.createElement('div');
+    handle.id = 'lensor-handle';
+    // assignCanvasProps(handle, InfoCanvasProps);
+    document.body.appendChild(handle);
+    state.handle = handle;
+    state.canvases.push(handle);
+}
+
 function createGridCanvas() {
     const gridCanvas = document.createElement('canvas');
     assignCanvasProps(gridCanvas, GridCanvasProps);
@@ -288,6 +362,7 @@ function showCanvases() {
 
 function createOffscreenCanvas() {
     const offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.id = 'lensor-offscreen-canvas';
     offscreenCanvas.style.visibility = 'hidden';
     offscreenCanvas.style.position = 'absolute';
     offscreenCanvas.style.left = '-9999px';
@@ -317,6 +392,41 @@ function drawGrid(spacing: number) {
     }
 
     gridCtx.stroke();
+}
+
+function drawCrosshairs() {
+    const { gridCtx, gridCanvas } = state;
+    if (!gridCtx || !gridCanvas) return;
+
+    const crosshairColor = 'black';
+    const crosshairWidth = 2;
+    const crosshairLength = 20;
+
+
+    // Calculate the center coordinates
+    const centerX = gridCanvas.width / 2;
+    const centerY = gridCanvas.height / 2;
+
+    gridCtx.save();
+
+    // Set the line style for the crosshairs
+    gridCtx.strokeStyle = crosshairColor;
+    gridCtx.lineWidth = crosshairWidth;
+
+    // Draw the horizontal line
+    gridCtx.beginPath();
+    gridCtx.moveTo(centerX - crosshairLength / 2, centerY);
+    gridCtx.lineTo(centerX + crosshairLength / 2, centerY);
+    gridCtx.stroke();
+
+    // Draw the vertical line
+    gridCtx.beginPath();
+    gridCtx.moveTo(centerX, centerY - crosshairLength / 2);
+    gridCtx.lineTo(centerX, centerY + crosshairLength / 2);
+    gridCtx.stroke();
+
+    // Restore the canvas state
+    gridCtx.restore();
 }
 
 function saveAsPNG(canvas: HTMLCanvasElement) {
