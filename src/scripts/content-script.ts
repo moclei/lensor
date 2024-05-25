@@ -1,66 +1,15 @@
+
 import { WeirwoodConnect, connect } from "weirwood";
 import tabsManager from "../service-workers/tabs/tabs-manager";
 import { assignCanvasProps } from "./canvas-utils";
 import { makeDraggable } from "./draggable";
 import interactions from "./user-interactions";
 import { LensorStateConfig } from "../weirwood/state-config";
-
-chrome.runtime.onMessage.addListener(async (message) => {
-    console.log('runtime.onMessage, heard: ', message);
-    switch (message.type) {
-        case 'start-app':
-            state.myTabId = message.tabId;
-            state.myStreamId = message.data;
-            initApp(message.data);
-            break;
-        case 'stop-recording':
-            stopRecording();
-            break;
-        default:
-            console.log('Unrecognized message:', message.type);
-    }
-});
+import { DerivedState } from "weirwood/dist/model/weirwood.model";
+import FisheyeGl from "../lib/fisheyegl";
 
 const BORDER_COLOR = 'rgb(87, 102, 111)';
 const CANVAS_SIZE = 400;
-
-// const InfoCanvasProps = {
-//     id: 'lensor-info-canvas',
-//     width: 80,
-//     height: 40,
-//     style: {
-//         position: 'fixed',
-//         zIndex: '9999997',
-//         backgroundColor: 'lightyellow',
-//         right: '10px',
-//         top: '410px',
-//         borderRadius: '6px',
-//         border: `0px`,
-//         overflow: 'hidden',
-//         boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
-//         display: 'none'
-//     }
-// }
-
-
-const InfoCanvasProps = {
-    id: 'lensor-info-canvas',
-    width: 80,
-    height: 150,
-    style: {
-        position: 'fixed',
-        zIndex: '9999997',
-        backgroundColor: '#8B4513', // Wooden color (saddle brown)
-        right: '95px',
-        top: '315px',
-        boxShadow: `inset 0 0 0 7px ${BORDER_COLOR}`,
-        overflow: 'hidden',
-        display: 'none',
-        transform: 'rotate(-40deg)', // Rotate the handle to the right at an angle
-        transformOrigin: 'top right', // Set the rotation origin to the top right corner
-        clipPath: 'polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%)', // Create a tapered shape
-    },
-};
 
 const MainCanvasProps = {
     id: 'lensor-main-canvas',
@@ -79,6 +28,43 @@ const MainCanvasProps = {
         display: 'none'
     }
 }
+
+const IntermediaryCanvasProps = {
+    id: 'lensor-intermediary-canvas',
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    style: {
+        position: 'fixed',
+        zIndex: '9999998',
+        right: '950px',
+        top: '10px',
+        borderRadius: '50%',
+        border: `8px solid ${BORDER_COLOR}`,
+        overflow: 'hidden',
+        boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+        imageRendering: 'pixelated',
+        display: 'none'
+    }
+}
+
+const FisheyeCanvasProps = {
+    id: 'lensor-fisheye-canvas',
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
+    style: {
+        position: 'fixed',
+        zIndex: '9999998',
+        right: '500px',
+        top: '10px',
+        borderRadius: '50%',
+        border: `8px solid ${BORDER_COLOR}`,
+        overflow: 'hidden',
+        boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+        imageRendering: 'pixelated',
+        display: 'none'
+    }
+}
+
 
 const GridCanvasProps = {
     id: 'lensor-grid-canvas',
@@ -112,12 +98,18 @@ type LensorState = {
     infoCtx: CanvasRenderingContext2D | null,
     offscreenCtx: CanvasRenderingContext2D | null,
     offscreenCanvas: HTMLCanvasElement | null,
+    fisheyeCanvas: HTMLCanvasElement | null,
+    fisheyeCtx: CanvasRenderingContext2D | null,
+    interCanvas: HTMLCanvasElement | null,
+    interCtx: CanvasRenderingContext2D | null,
     initialized: boolean,
     scale: number,
     selectedPixelColor: string | null,
     myTabId: number | null,
     weirwood: WeirwoodConnect<typeof LensorStateConfig> | null,
-    myStreamId: number | null
+    myStreamId: string | null,
+    gridDrawn: boolean,
+    interactionsStarted: boolean
 }
 
 const state: LensorState = {
@@ -132,111 +124,77 @@ const state: LensorState = {
     canvases: [],
     gridCtx: null,
     gridCanvas: null,
+    gridDrawn: false,
     infoCtx: null,
     infoCanvas: null,
     offscreenCtx: null,
     offscreenCanvas: null,
+    fisheyeCanvas: null,
+    fisheyeCtx: null,
+    interCanvas: null,
+    interCtx: null,
     initialized: false,
     scale: 1,
     selectedPixelColor: null,
     myTabId: null,
     weirwood: null,
     myStreamId: null,
-    handle: null
+    handle: null,
+    interactionsStarted: false
 }
 
-function handleMove(coords: { x: number, y: number }) {
-    console.log(handleMove, 'coords:', coords)
-    state.mouseX = coords.x;
-    state.mouseY = coords.y;
-}
-
-interactions.registerIxnListeners({
-    handleStop: () => {
-        stopRecording();
-    },
-    handleMove,
-    handleZoom: (change: number) => {
-        state.zoom += change;
-        if (state.zoom < 1) state.zoom = 1;
-        if (state.zoom > 6) state.zoom = 6;
-    },
-    handleScroll: takeSnapshot()
+chrome.runtime.onMessage.addListener(async (message) => {
+    console.log('runtime.onMessage, heard: ', message);
+    switch (message.type) {
+        case 'start-app':
+            state.myTabId = message.tabId;
+            state.myStreamId = message.data;
+            // initApp(message.data);
+            initInstance();
+            break;
+        case 'stop-app':
+            stopRecording();
+            break;
+        default:
+            console.log('Unrecognized message:', message.type);
+    }
 });
 
-function createAndStartVideoElement(media: MediaStream) {
-    const videoElement = document.createElement('video');
-
-    videoElement.addEventListener('loadedmetadata', () => {
-        if (!videoElement) return;
-        console.log("Video element loaded!");
-        const videoWidth = videoElement.videoWidth;
-        // const videoHeight = videoElement.videoHeight;
-        state.scale = videoWidth / window.innerWidth;
-        // scaleY = videoHeight / window.innerHeight;
-        drawGrid(state.scale * state.zoom);
-    });
-
-    videoElement.style.visibility = 'hidden';
-    videoElement.style.position = 'absolute';
-    videoElement.style.left = '-9999px';
-    document.body.appendChild(videoElement);
-
-    state.videoElement = videoElement;
-
-    // Set the stream as the source for the video element
-    videoElement.srcObject = media;
-    videoElement.play();
-    videoElement.oncanplay = onPlayStarted;
-}
-
-function onPlayStarted() {
-    console.log('onPlayStarted');
-    const { ctx, videoElement, offscreenCtx, offscreenCanvas, media } = state;
-    if (!ctx || !videoElement || !offscreenCtx || !offscreenCanvas) return;
-
-    const cropRegion = cropImage(videoElement.videoWidth, videoElement.videoHeight, window.innerWidth, window.innerHeight);
-
-    offscreenCanvas.height = videoElement.videoHeight;
-    offscreenCanvas.width = videoElement.videoWidth;
-    offscreenCtx.drawImage(videoElement, cropRegion.x, cropRegion.y, cropRegion.width, cropRegion.height, 0, 0, cropRegion.width, cropRegion.height);
-    state.initialized = true;
-    updateCanvas();
-    media!.getVideoTracks()[0].stop();
-    showCanvases();
-    state.weirwood!.set({ initialized: true });
-}
-
-async function initApp(streamId: string) {
-    console.log("initApp, streamId:", streamId);
+async function initInstance() {
+    console.log("initInstance()");
     if (self === top && !state.initialized) {
-        // first call to open app, initialize video, weirwodd and canvases.
-        // await initializeVideo(streamId);
-        // if (!state.media) return;
-        // createCanvases();
-
-        // subsequently we listen to weirwood state changes and update canvases accordingly.
-        const weirwood = connect(LensorStateConfig, "Content script");
+        console.log("initInstance, we have creation!");
+        const weirwood = connect(LensorStateConfig, "content_script");
         state.weirwood = weirwood;
-        weirwood.subscribe(async (changes) => {
-            console.log('initApp weirwood subscription, changes:', changes);
-            if (!changes.active) {
-                await initializeVideo(streamId);
-                if (!state.media) return;
-                createCanvases();
-            } else if (changes.active) {
-                stopRecording();
-            }
-        }, ['active', 'initialized']);
+        weirwood.subscribe(handleMediaStreamChange, ['mediaStreamId', 'active']);
+    }
+};
 
+async function handleMediaStreamChange(changes: Partial<DerivedState<typeof LensorStateConfig>>) {
+    console.log('handleMediaStreamChange, changes:', changes);
+    const { mediaStreamId, active, initialized } = changes;
+    if (mediaStreamId === null && !active && !initialized) {
+        console.log("handleMediaStreamChange, Activating!");
+        state.weirwood!.set({ active: true });
+    }
+    else if (mediaStreamId && state.myStreamId !== mediaStreamId) {
+        console.log("handleMediaStreamChange, mediaStreamId changed")
+        state.myStreamId = mediaStreamId;
+        const media = await createMediaStream(mediaStreamId);
+        if (!media) return;
+        if (!state.canvas) createCanvases();
+        if (!state.interactionsStarted) startInteractions();
+        initializeImageCapture(media);
+        state.media = media;
     }
 }
 
-async function initializeVideo(streamId: string) {
+async function createMediaStream(streamId: string): Promise<MediaStream | null> {
     console.log("initializeVideo");
+    let media = null;
     try {
         console.log("Trying to initialize video stream for streamId: ", streamId);
-        state.media = await (navigator.mediaDevices as any).getUserMedia({
+        media = await (navigator.mediaDevices as any).getUserMedia({
             video: {
                 mandatory: {
                     chromeMediaSource: 'tab',
@@ -246,23 +204,94 @@ async function initializeVideo(streamId: string) {
         });
     } catch (recordException: any) {
         console.log('error starting recording: ', recordException);
-        state.media = null;
+        media = null;
     }
+    return media;
 }
 
+
 async function createCanvases() {
+    console.log("createCanvases()");
     createMainCanvas();
-    // createInfoCanvas();
+    createIntermediaryCanvas();
     createHandle();
     createGridCanvas();
     drawCrosshairs();
     createOffscreenCanvas();
-    createAndStartVideoElement(state.media!);
-    interactions.startIxn();
-    makeDraggable(state.handle!, [state.gridCanvas!, state.canvas!], 8, handleMove);
+    createFisheyeCanvas();
+    console.log("finished createCanvas()");
 }
+async function startInteractions() {
+    interactions.registerIxnListeners({
+        handleStop: () => {
+            stopRecording();
+        },
+        handleZoom: (change: number) => {
+            state.zoom += change;
+            if (state.zoom < 1) state.zoom = 1;
+            if (state.zoom > 6) state.zoom = 6;
+        },
+        handleScroll: () => {
+            console.log('scroll handler called');
+            showCanvases(false);
+            setTimeout(() => {
+                state.weirwood!.set({ mediaStreamId: null });
+            }, 500);
+
+        },
+    });
+    interactions.startIxn();
+    makeDraggable(state.handle!, [state.gridCanvas!, state.canvas!], 8, (coords: { x: number, y: number }) => {
+        state.mouseX = coords.x;
+        state.mouseY = coords.y;
+    });
+    state.interactionsStarted = true;
+}
+// Version 2 of createAndStartVideoElement
+function initializeImageCapture(media: MediaStream) {
+    console.log('initializeImageCapture()')
+    if (!state.videoElement) {
+        const videoElement = state.videoElement || document.createElement('video');
+        videoElement.style.visibility = 'hidden';
+        videoElement.style.position = 'absolute';
+        videoElement.style.left = '-9999px';
+        state.videoElement = videoElement;
+        document.body.appendChild(state.videoElement);
+        state.videoElement.addEventListener('loadedmetadata', (event) => {
+            if (!state.videoElement) return;
+            console.log("Video element loaded! event: ", event);
+            const videoWidth = state.videoElement.videoWidth;
+            state.scale = videoWidth / window.innerWidth;
+            if (!state.gridDrawn) {
+                drawGrid(state.scale * state.zoom);
+                state.gridDrawn = true;
+            }
+        });
+        state.videoElement.oncanplay = onImageCaptureBegin;
+    }
+    state.videoElement.srcObject = media;
+    state.videoElement.play();
+}
+
+function onImageCaptureBegin() {
+    console.log('onImageCaptureBegin');
+    const { ctx, videoElement, offscreenCtx, offscreenCanvas, media } = state;
+    if (!ctx || !videoElement || !offscreenCtx || !offscreenCanvas) return;
+
+    const cropRegion = cropImage(videoElement.videoWidth, videoElement.videoHeight, window.innerWidth, window.innerHeight);
+    offscreenCanvas.height = videoElement.videoHeight;
+    offscreenCanvas.width = videoElement.videoWidth;
+    offscreenCtx.drawImage(videoElement, cropRegion.x, cropRegion.y, cropRegion.width, cropRegion.height, 0, 0, cropRegion.width, cropRegion.height);
+    // console.log(offScreenCtx);
+    state.initialized = true;
+    media!.getVideoTracks()[0].stop();
+    showCanvases(true);
+    console.log('onImageCapture finished. Setting initialized to true.');
+    state.weirwood!.set({ initialized: true });
+}
+
 async function stopRecording() {
-    console.log('stopRecording');
+    console.log('stopRecording()');
     const { canvas, ctx, gridCtx, gridCanvas, videoElement, media } = state;
     tabsManager.setTabRecording(state.myTabId!, false);
     media!.getVideoTracks()[0].stop();
@@ -281,9 +310,15 @@ async function stopRecording() {
         state.gridCtx = null;
         state.gridCanvas = null;
     }
+    if (state.handle) {
+        document.body.removeChild(state.handle);
+        state.handle = null;
+    }
     interactions.stopIxn();
+    state.weirwood!.set({ active: false, mediaStreamId: null });
 }
 
+// Called every frame.. Could be optimized to only call on mouse move, or image capture
 function updateCanvas() {
     const { canvas, ctx, offscreenCanvas, videoElement, initialized, scale, mouseX, mouseY } = state;
     if (!videoElement || !ctx || !canvas || !offscreenCanvas || !initialized) {
@@ -291,6 +326,9 @@ function updateCanvas() {
         return;
     }
     if (initialized) {
+
+        // Draw the distorted image onto the fisheye canvas
+        // state.ctx!.drawImage(fisheyeImage, 0, 0, state.canvas!.width, state.canvas!.height);
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
         const canvasXAdjust = CANVAS_SIZE / (state.zoom * 2);
@@ -306,7 +344,70 @@ function updateCanvas() {
     requestAnimationFrame(updateCanvas);
 }
 
+// Called every frame.. Could be optimized to only call on mouse move, or image capture
+let image: HTMLImageElement;
+let distorter: any;
+function updateCanvas2() {
+    const { canvas, ctx, fisheyeCanvas, offscreenCanvas, interCanvas, interCtx, videoElement, initialized, scale, mouseX, mouseY } = state;
+    if (!videoElement || !ctx || !canvas || !interCanvas || !interCtx || !offscreenCanvas || !fisheyeCanvas || !initialized) {
+        console.log("updateCanvas skipped, initialized: ", initialized);
+        return;
+    }
+    if (initialized && !distorter) {
+        distorter = FisheyeGl({
+            selector: '#lensor-fisheye-canvas',
+            lens: {
+                a: 1,    // 0 to 4;  default 1
+                b: 1,    // 0 to 4;  default 1
+                Fx: 0.15, // 0 to 4;  default 0.0
+                Fy: 0.15, // 0 to 4;  default 0.0
+                scale: 1 // 0 to 20; default 1.5
+            },
+            fov: {
+                x: 1, // 0 to 2; default 1
+                y: 1  // 0 to 2; default 1
+            },
+        });
+    }
+    if (initialized) {
+
+        ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        interCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+        const canvasXAdjust = CANVAS_SIZE / (state.zoom * 2);
+        const canvasYAdjust = CANVAS_SIZE / (state.zoom * 2);
+
+        const cropX = (mouseX * scale) - canvasXAdjust;
+        const cropY = (mouseY * scale) - canvasYAdjust;
+
+        interCtx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / state.zoom, CANVAS_SIZE / state.zoom, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        // fisheyeCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        // fisheyeCtx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / state.zoom, CANVAS_SIZE / state.zoom, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        const fisheyeImageDataUrl = interCanvas.toDataURL();
+        if (!image) {
+            image = new Image();
+            image.src = fisheyeImageDataUrl;
+            const imageWindow = document.getElementById('image-window');
+            // imageWindow!.style.backgroundImage = 'url(' + distorter.getCanvasDataUrl() + ')';
+            imageWindow!.style.backgroundImage = 'url(' + image.src + ')';
+        }
+        // image.src = fisheyeImageDataUrl;
+        // const imageWindow = document.getElementById('image-window');
+        // image.onload = function () {
+        // Initialize fisheyeGl with the loaded image
+        distorter.setImage(fisheyeImageDataUrl);
+        // distorter.run();
+        // const fisheyeImage = distorter.getCanvasDataUrl();
+
+        ctx.drawImage(distorter.getCanvas(), 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        // };
+        updateSelectedPixel();
+    }
+    requestAnimationFrame(updateCanvas2);
+}
+
 function updateSelectedPixel() {
+    //console.log("updateSelectedPixel()");
     const { prevCoords, mouseX, mouseY } = state;
     if (mouseX !== prevCoords.x || mouseY !== prevCoords.y) {
         state.prevCoords = { x: mouseX, y: mouseY };
@@ -318,7 +419,26 @@ function updateSelectedPixel() {
     }
 }
 
+function showCanvases(visible: boolean) {
+    console.log("showCanvases(", visible, ")");
+
+    if (visible) {
+        for (let canvas of state.canvases) {
+            canvas!.style.display = 'block';
+            canvas!.style.visibility = 'visible';
+            updateCanvas2();
+        }
+    } else {
+        for (let canvas of state.canvases) {
+            canvas!.style.display = 'none';
+            canvas!.style.visibility = 'hidden';
+        }
+    }
+
+}
+
 function createMainCanvas() {
+    console.log("createMainCanvas()");
     const canvas = document.createElement('canvas');
     assignCanvasProps(canvas, MainCanvasProps);
     document.body.appendChild(canvas);
@@ -327,40 +447,29 @@ function createMainCanvas() {
     state.canvases.push(canvas);
 }
 
-function createInfoCanvas() {
-    const infoCanvas = document.createElement('canvas');
-    assignCanvasProps(infoCanvas, InfoCanvasProps);
-    document.body.appendChild(infoCanvas);
-    state.infoCtx = infoCanvas.getContext('2d');
-    state.infoCanvas = infoCanvas;
-    state.canvases.push(infoCanvas);
+
+function createFisheyeCanvas() {
+    console.log("createFisheyeCanvas()");
+    const fisheyeCanvas = document.createElement('canvas');
+    assignCanvasProps(fisheyeCanvas, FisheyeCanvasProps);
+    document.body.appendChild(fisheyeCanvas);
+    state.fisheyeCanvas = fisheyeCanvas;
+    // state.fisheyeCtx = fisheyeCanvas.getContext('2d');
+    state.canvases.push(fisheyeCanvas);
 }
 
-function createHandle() {
-    const handle = document.createElement('div');
-    handle.id = 'lensor-handle';
-    // assignCanvasProps(handle, InfoCanvasProps);
-    document.body.appendChild(handle);
-    state.handle = handle;
-    state.canvases.push(handle);
-}
-
-function createGridCanvas() {
-    const gridCanvas = document.createElement('canvas');
-    assignCanvasProps(gridCanvas, GridCanvasProps);
-    document.body.appendChild(gridCanvas);
-    state.gridCanvas = gridCanvas;
-    state.gridCtx = gridCanvas.getContext('2d');
-    state.canvases.push(gridCanvas);
-}
-
-function showCanvases() {
-    for (let canvas of state.canvases) {
-        canvas!.style.display = 'block';
-    }
+function createIntermediaryCanvas() {
+    console.log("createMainCanvas()");
+    const canvas = document.createElement('canvas');
+    assignCanvasProps(canvas, IntermediaryCanvasProps);
+    document.body.appendChild(canvas);
+    state.interCtx = canvas.getContext('2d');
+    state.interCanvas = canvas;
+    state.canvases.push(canvas);
 }
 
 function createOffscreenCanvas() {
+    console.log("createOffscreenCanvas()");
     const offscreenCanvas = document.createElement('canvas');
     offscreenCanvas.id = 'lensor-offscreen-canvas';
     offscreenCanvas.style.visibility = 'hidden';
@@ -372,7 +481,32 @@ function createOffscreenCanvas() {
     state.offscreenCtx = offscreenCanvas.getContext('2d');
 }
 
+function createHandle() {
+    console.log("createHandle()");
+    const handle = document.createElement('div');
+    handle.id = 'lensor-handle';
+    document.body.appendChild(handle);
+    state.handle = handle;
+    state.canvases.push(handle);
+
+    console.log("createImageWindow()");
+    const imageWindow = document.createElement('div');
+    imageWindow.id = 'image-window';
+    document.body.appendChild(imageWindow);
+}
+
+function createGridCanvas() {
+    console.log("createGridCanvas()");
+    const gridCanvas = document.createElement('canvas');
+    assignCanvasProps(gridCanvas, GridCanvasProps);
+    document.body.appendChild(gridCanvas);
+    state.gridCanvas = gridCanvas;
+    state.gridCtx = gridCanvas.getContext('2d');
+    state.canvases.push(gridCanvas);
+}
+
 function drawGrid(spacing: number) {
+    console.log("drawGrid()");
     const { gridCtx, gridCanvas } = state;
     if (!gridCtx || !gridCanvas) return;
     gridCtx.strokeStyle = '#000000'; // Grid line color
@@ -395,6 +529,7 @@ function drawGrid(spacing: number) {
 }
 
 function drawCrosshairs() {
+    console.log("drawCrosshairs()");
     const { gridCtx, gridCanvas } = state;
     if (!gridCtx || !gridCanvas) return;
 
@@ -443,6 +578,7 @@ function saveAsPNG(canvas: HTMLCanvasElement) {
 }
 
 function formatDateTime(date: Date): string {
+    console.log("formatDateTime()");
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     const hours = date.getHours().toString().padStart(2, '0');
@@ -456,7 +592,7 @@ function cropImage
         windowWidth: number,
         windowHeight: number
     ): { x: number, y: number, width: number, height: number } {
-
+    console.log("cropImage()");
     console.log(`Crop image, canvasWidth: ${canvasWidth}, canvasHeight: ${canvasHeight}, windowWidth: ${windowWidth}, windowHeight: ${windowHeight}`)
     let scaleFactor, newWidth, newHeight;
 

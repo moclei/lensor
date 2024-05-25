@@ -25,7 +25,6 @@ const registerTab = async (tabId: number) => {
     if (!currentTabs.has(tabId)) {
         currentTabs.set(tabId, false);
         await chrome.storage.session.set({ 'tabs': Array.from(currentTabs) });
-        console.log("TabAdded, tabs: ", currentTabs);
     }
 }
 
@@ -38,7 +37,6 @@ const deRegisterTab = async (tabId: number) => {
     if (currentTabs.has(tabId)) {
         currentTabs.delete(tabId);
         await chrome.storage.session.set({ 'tabs': Array.from(currentTabs) });
-        console.log("TabRemoved, tabs: ", currentTabs);
     }
 }
 
@@ -54,7 +52,7 @@ const getTabs = async (): Promise<Map<number, boolean>> => {
         console.log("Error getting tabs from session storage (lastError): ", chrome.runtime.lastError);
         return new Map([]);
     }
-    console.log("getTabs, storage: ", storage);
+    // console.log("getTabs, storage: ", storage);
     return new Map(storage?.tabs || []);
 }
 
@@ -63,7 +61,6 @@ const setTabRecording = async (tabId: number, status: boolean) => {
     const currentTabs = await getTabs();
     currentTabs.set(tabId, status);
     await chrome.storage.session.set({ 'tabs': Array.from(currentTabs) });
-    console.log("Tab status set, tabs: ", currentTabs);
 }
 
 
@@ -96,13 +93,13 @@ const initialize = () => {
         console.log("Tab attached: ", tabId, attachInfo.newWindowId);
     });
     chrome.tabs.onActivated.addListener(info => {
-        console.log("Active tab changed: ", info.tabId, info.windowId);
+        // console.log("Active tab changed: ", info.tabId, info.windowId);
     });
     chrome.tabs.onDetached.addListener((tabId, detachInfo) => {
         console.log("Tab detached: ", tabId, detachInfo.oldWindowId);
     });
     chrome.tabs.onHighlighted.addListener(highlightInfo => {
-        console.log("Tabs highlighted: ", highlightInfo.tabIds);
+        // console.log("Tabs highlighted: ", highlightInfo.tabIds);
     });
     chrome.tabs.onMoved.addListener((tabId, moveInfo) => {
         console.log("Tab moved: ", tabId, moveInfo.fromIndex, moveInfo.toIndex);

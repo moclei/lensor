@@ -44,20 +44,41 @@ chrome.runtime.onInstalled.addListener(async (details: chrome.runtime.InstalledD
     }
 });
 
-chrome.action.onClicked.addListener(async (tab) => {
-    console.log('Action clicked, tab: ', tab);
-    const { active, initialized } = weirwood.get(tab.id!);
-    if (!initialized) {
-        console.log('Not initialized, starting app.');
+weirwood.subscribe(async (state, changes, tabId) => {
+    if (!tabId) return;
+    const { active, initialized, mediaStreamId } = state;
+    // const { mediaStreamId } = changes;
+    console.log('active: ', active, ', initialized: ', initialized, ', mediaStreamId: ', mediaStreamId);
+    if (active && !mediaStreamId) {
+        console.log('Active but null media stream, create one.');
         // Get a MediaStream for the active tab.
         const streamId = await (chrome.tabCapture as any).getMediaStreamId({
-            consumerTabId: tab.id,
-            targetTabId: tab.id
+            consumerTabId: tabId,
+            targetTabId: tabId
         });
-        // Send the stream ID to the offscreen document to start recording.
-        chrome.tabs.sendMessage(tab.id!, {
+        weirwood.set({ mediaStreamId: streamId }, tabId);
+    }
+});
+
+chrome.action.onClicked.addListener(async (tab) => {
+    console.log('Action clicked, tab: ', tab);
+    if (!tab.id) return;
+    const { initialized } = weirwood.get(tab.id);
+    if (!initialized) {
+        console.log('Not initialized, starting app.');
+        chrome.tabs.sendMessage(tab.id, {
             type: 'start-app',
-            data: streamId,
+            tabId: tab.id
+        });
+        // Inject the fisheyegl library into the active tab
+        // chrome.scripting.executeScript({
+        //     target: { tabId: tab.id },
+        //     files: ['lib/fisheyegl.js'],
+        // });
+    } else {
+        console.log('Initialized, stopping app.');
+        chrome.tabs.sendMessage(tab.id, {
+            type: 'stop-app',
             tabId: tab.id
         });
     }

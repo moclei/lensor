@@ -58,6 +58,15 @@ const build = () => {
         format: 'esm'
     }).catch(() => process.exit(1));
 
+    // esbuild.build({
+    //     entryPoints: ['./src/lib/fisheyegl.js',],
+    //     outdir: './dist/lib',
+    //     bundle: true,
+    //     minify: false,
+    //     sourcemap: true,
+    //     format: 'esm'
+    // }).catch(() => process.exit(1));
+
     // Copy assets
     assets.forEach(assetDir => {
         fs.readdirSync(assetDir).forEach(file => {
@@ -82,7 +91,7 @@ build();
 
 // Watch for file changes in src directory
 chokidar.watch(srcDir).on('change', (event, path) => {
-    console.log(`File ${path} has been changed`);
+    console.log(`Rebuilding => File ${event} has been changed`);
     build();
 });
 

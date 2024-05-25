@@ -1,52 +1,70 @@
 type InteractionState = {
     handleStop: (() => void) | null;
-    handleMove: ((coords: { x: number, y: number }) => void) | null;
     handleZoom: ((change: number) => void) | null;
     handleScroll: (() => void) | null;
 }
 
 const interactionState: InteractionState = {
     handleStop: null,
-    handleMove: null,
     handleZoom: null,
     handleScroll: null
 }
 
 let debounceTimeout: NodeJS.Timeout | null = null;
-const debounceDelay = 2000;
+const debounceDelay = 300;
+let initialScroll = true;
+let lastScrollTop = 0;
+let scrollDelta = 0;
 
 function registerIxnListeners(
     actions: {
         handleStop: () => void,
-        handleMove: (coords: { x: number, y: number }) => void,
         handleZoom: (change: number) => void,
         handleScroll: () => void
     }) {
     interactionState.handleStop = actions.handleStop;
-    interactionState.handleMove = actions.handleMove;
     interactionState.handleZoom = actions.handleZoom;
     interactionState.handleScroll = actions.handleScroll;
-    document.addEventListener('scroll', onScrollListener);
+    // Delay a little bit because opening the extension can trigger a scroll event.
+    window.addEventListener('scroll', onScrollListener);
 }
 
 function startIxn() {
     document.addEventListener('keydown', onKeyDownListener);
-    document.addEventListener('mousemove', onMouseMoveListener);
 }
 
 function stopIxn() {
     document.removeEventListener('keydown', onKeyDownListener);
-    document.removeEventListener('mousemove', onMouseMoveListener)
 }
 
-function onScrollListener() {
-    if (debounceTimeout) {
-        clearTimeout(debounceTimeout);
-    }
+function onScrollListener(event: Event) {
 
-    debounceTimeout = setTimeout(() => {
-        interactionState.handleScroll?.();
-    }, debounceDelay);
+    if (event.isTrusted) {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        scrollDelta += scrollTop - lastScrollTop;
+
+        // console.log('Scroll Delta:', scrollDelta);
+
+        lastScrollTop = scrollTop;
+        if (scrollDelta > 1) {
+            // console.log("Scroll event was trusted.")
+            if (initialScroll || event.timeStamp < 10000) {
+                initialScroll = false;
+                return;
+            }
+            if (debounceTimeout) {
+                clearTimeout(debounceTimeout);
+            }
+
+            debounceTimeout = setTimeout(() => {
+                console.log("Scroll event debounced. Re capturing screen");
+                scrollDelta = 0;
+                interactionState.handleScroll?.();
+            }, debounceDelay);
+        }
+    } else {
+        console.log("Scroll event not trusted.")
+    }
 }
 
 function onKeyDownListener(event: KeyboardEvent) {
@@ -68,9 +86,4 @@ function onKeyDownListener(event: KeyboardEvent) {
         }
     }
 }
-
-function onMouseMoveListener(event: MouseEvent) {
-    // interactionState.handleMove?.({ x: event.pageX, y: event.pageY });
-}
-
 export default { registerIxnListeners, startIxn, stopIxn };

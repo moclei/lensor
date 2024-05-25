@@ -18,9 +18,11 @@
   "author": "Marc O'Cleirig",
   "license": "MIT",
   "dependencies": {
+    "@types/node": "^20.12.12",
     "chokidar": "^3.5.3",
     "esbuild": "^0.19.9",
-    "weirwood": "^1.0.4"
+    "fisheyegl": "^0.1.2",
+    "weirwood": "^1.0.7"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.254",

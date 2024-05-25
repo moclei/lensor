@@ -3,7 +3,6 @@
 #lensor-handle {
     width: 80px;
     height: 150px;
-    background-color: black;
     clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%);
     position: fixed;
     z-index: 9999997;
@@ -32,4 +31,16 @@
     clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%);
     transform: scale(0.8);
     transform-origin: center;
+}
+
+#image-window {
+    position: fixed;
+    width: 400px;
+    height: 400px;
+    background-color: black;
+    background-size: cover;
+    background-position: cover;
+    z-index: 9999997;
+    right: 395px;
+    top: 515px;
 }

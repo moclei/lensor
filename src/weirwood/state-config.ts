@@ -9,4 +9,8 @@ export const LensorStateConfig = {
         default: false,
         partition: Partition.Instance
     },
+    mediaStreamId: {
+        default: null as string | null,
+        partition: Partition.Instance
+    },
 }
