@@ -10,7 +10,15 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "porter-source": [
+        "../porter-source/dist"
+      ],
+      "crann": [
+        "../crann/dist"
+      ],
+    },
   },
   "include": [
     "src/**/*"

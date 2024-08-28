@@ -1,12 +1,16 @@
 
-import { WeirwoodConnect, connect } from "weirwood";
+// import { WeirwoodConnect, connect } from "weirwood";
+import { connect, connected } from 'crann';
 import tabsManager from "../service-workers/tabs/tabs-manager";
 import { assignCanvasProps } from "./canvas-utils";
 import { makeDraggable } from "./draggable";
 import interactions from "./user-interactions";
 import { LensorStateConfig } from "../weirwood/state-config";
 import { DerivedState } from "weirwood/dist/model/weirwood.model";
-import FisheyeGl from "../lib/fisheyegl";
+import FisheyeGl, { Fisheye } from "../lib/fisheyegl";
+import { observeDOMChanges } from "./observable";
+import { loadHtmlTemplate } from './utils/template-loader';
+import { connect as porterConnect } from "porter-source";
 
 const BORDER_COLOR = 'rgb(87, 102, 111)';
 const CANVAS_SIZE = 400;
@@ -23,7 +27,7 @@ const MainCanvasProps = {
         borderRadius: '50%',
         border: `8px solid ${BORDER_COLOR}`,
         overflow: 'hidden',
-        boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
+        boxShadow: 'inset 0 0 10px rgba(0, 0, 0, 0.5)',
         imageRendering: 'pixelated',
         display: 'none'
     }
@@ -36,12 +40,11 @@ const IntermediaryCanvasProps = {
     style: {
         position: 'fixed',
         zIndex: '9999998',
-        right: '950px',
+        left: '-10950px',
         top: '10px',
         borderRadius: '50%',
         border: `8px solid ${BORDER_COLOR}`,
         overflow: 'hidden',
-        boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
         imageRendering: 'pixelated',
         display: 'none'
     }
@@ -54,7 +57,7 @@ const FisheyeCanvasProps = {
     style: {
         position: 'fixed',
         zIndex: '9999998',
-        right: '500px',
+        left: '-10500px',
         top: '10px',
         borderRadius: '50%',
         border: `8px solid ${BORDER_COLOR}`,
@@ -77,7 +80,8 @@ const GridCanvasProps = {
         top: '18px',
         borderRadius: '50%',
         overflow: 'hidden',
-        display: 'none'
+        display: 'none',
+        boxShadow: 'rgb(0, 0, 0) 0px 0px 16px inset'
     }
 }
 
@@ -95,6 +99,7 @@ type LensorState = {
     gridCanvas: HTMLCanvasElement | null,
     infoCanvas: HTMLCanvasElement | null,
     handle: HTMLElement | null,
+    ringHandle: HTMLElement | null,
     infoCtx: CanvasRenderingContext2D | null,
     offscreenCtx: CanvasRenderingContext2D | null,
     offscreenCanvas: HTMLCanvasElement | null,
@@ -106,10 +111,18 @@ type LensorState = {
     scale: number,
     selectedPixelColor: string | null,
     myTabId: number | null,
-    weirwood: WeirwoodConnect<typeof LensorStateConfig> | null,
+    // weirwood: WeirwoodConnect<typeof LensorStateConfig> | null,
     myStreamId: string | null,
     gridDrawn: boolean,
     interactionsStarted: boolean
+    distorter: Fisheye | null,
+    buttonContainer: HTMLElement | null,
+    buttonSegment: HTMLElement | null,
+    infoScroll: HTMLElement | null,
+    toggleGridInput: HTMLElement | null,
+    toggleFisheyeInput: HTMLElement | null,
+    gridOn: boolean,
+    fisheyeOn: boolean
 }
 
 const state: LensorState = {
@@ -137,52 +150,70 @@ const state: LensorState = {
     scale: 1,
     selectedPixelColor: null,
     myTabId: null,
-    weirwood: null,
     myStreamId: null,
     handle: null,
-    interactionsStarted: false
+    ringHandle: null,
+    interactionsStarted: false,
+    distorter: null,
+    buttonContainer: null,
+    buttonSegment: null,
+    infoScroll: null,
+    toggleGridInput: null,
+    toggleFisheyeInput: null,
+    gridOn: true,
+    fisheyeOn: true
 }
 
-chrome.runtime.onMessage.addListener(async (message) => {
-    console.log('runtime.onMessage, heard: ', message);
-    switch (message.type) {
-        case 'start-app':
-            state.myTabId = message.tabId;
-            state.myStreamId = message.data;
-            // initApp(message.data);
-            initInstance();
-            break;
-        case 'stop-app':
-            stopRecording();
-            break;
-        default:
-            console.log('Unrecognized message:', message.type);
-    }
-});
+console.log('ContentScript loaded!');
+if (self === top) {
+    console.log('Self was top, connecting to porter');
+    const [post, setMessage] = porterConnect();
+    setMessage({
+        'hello': (message) => {
+            console.log('Lensor ContentSCript, Received hello message: ', message);
+            post({ action: 'hello_back', payload: 'from content script' });
+        },
+        'action-clicked': (message, agent) => {
+            console.log('Lensor ContentScript, action-clicked heard!');
+            if (self === top) {
+                console.log("Lensor initialize");
+                setInitialized(true);
+            }
+        }
+    });
+}
 
-async function initInstance() {
-    console.log("initInstance()");
-    if (self === top && !state.initialized) {
-        console.log("initInstance, we have creation!");
-        const weirwood = connect(LensorStateConfig, "content_script");
-        state.weirwood = weirwood;
-        weirwood.subscribe(handleMediaStreamChange, ['mediaStreamId', 'active']);
-    }
-};
+// chrome.runtime.onMessage.addListener(async (message) => {
+//     // console.log('runtime.onMessage, heard: ', message);
+//     switch (message.type) {
+//         case 'start-app':
+//             state.myTabId = message.tabId;
+//             state.myStreamId = message.data;
+//             // initApp(message.data);
+//             initInstance();
+//             break;
+//         case 'stop-app':
+//             stopRecording();
+//             break;
+//         default:
+//             console.log('Unrecognized message:', message.type);
+//     }
+// });
+const [useCrann, get] = connect(LensorStateConfig);
+const [active, setActive] = useCrann('active');
+const [initialized, setInitialized] = useCrann('initialized');
+const [mediaStreamId, setMediaStreamId, onMediaStreamChange] = useCrann('mediaStreamId');
+onMediaStreamChange(handleMediaStreamChange);
 
-async function handleMediaStreamChange(changes: Partial<DerivedState<typeof LensorStateConfig>>) {
-    console.log('handleMediaStreamChange, changes:', changes);
-    const { mediaStreamId, active, initialized } = changes;
-    if (mediaStreamId === null && !active && !initialized) {
-        console.log("handleMediaStreamChange, Activating!");
-        state.weirwood!.set({ active: true });
+async function handleMediaStreamChange(mediaStreamId: string | null) {
+    console.log('handleMediaStreamChange, mediaStreamId: ', mediaStreamId);
+    if (!mediaStreamId && !active && !initialized) {
+        setActive(true)
     }
-    else if (mediaStreamId && state.myStreamId !== mediaStreamId) {
-        console.log("handleMediaStreamChange, mediaStreamId changed")
-        state.myStreamId = mediaStreamId;
+    else if (mediaStreamId) {
         const media = await createMediaStream(mediaStreamId);
         if (!media) return;
-        if (!state.canvas) createCanvases();
+        if (!state.canvas) await createCanvases();
         if (!state.interactionsStarted) startInteractions();
         initializeImageCapture(media);
         state.media = media;
@@ -190,10 +221,10 @@ async function handleMediaStreamChange(changes: Partial<DerivedState<typeof Lens
 }
 
 async function createMediaStream(streamId: string): Promise<MediaStream | null> {
-    console.log("initializeVideo");
+    // console.log("initializeVideo");
     let media = null;
     try {
-        console.log("Trying to initialize video stream for streamId: ", streamId);
+        // console.log("Trying to initialize video stream for streamId: ", streamId);
         media = await (navigator.mediaDevices as any).getUserMedia({
             video: {
                 mandatory: {
@@ -203,23 +234,27 @@ async function createMediaStream(streamId: string): Promise<MediaStream | null> 
             }
         });
     } catch (recordException: any) {
-        console.log('error starting recording: ', recordException);
+        // console.log('error starting recording: ', recordException);
         media = null;
     }
     return media;
 }
 
-
 async function createCanvases() {
-    console.log("createCanvases()");
+    // console.log("createCanvases()");
     createMainCanvas();
     createIntermediaryCanvas();
+    // Create button after handle
     createHandle();
+    await createButton();
     createGridCanvas();
     drawCrosshairs();
     createOffscreenCanvas();
     createFisheyeCanvas();
-    console.log("finished createCanvas()");
+    observeDOMChanges((changeScore: number) => {
+        // console.log("DOM changed! Score was: ", changeScore);
+    });
+    // console.log("finished createCanvas()");
 }
 async function startInteractions() {
     interactions.registerIxnListeners({
@@ -232,24 +267,24 @@ async function startInteractions() {
             if (state.zoom > 6) state.zoom = 6;
         },
         handleScroll: () => {
-            console.log('scroll handler called');
+            // const [_, setMediaStreamId] = useCrann('mediaStreamId');
+            // console.log('scroll handler called');
             showCanvases(false);
             setTimeout(() => {
-                state.weirwood!.set({ mediaStreamId: null });
+                setMediaStreamId(null);
             }, 500);
-
         },
     });
     interactions.startIxn();
-    makeDraggable(state.handle!, [state.gridCanvas!, state.canvas!], 8, (coords: { x: number, y: number }) => {
+    makeDraggable(state.ringHandle!, [state.gridCanvas!, state.canvas!, state.infoScroll!], 8, (coords: { x: number, y: number }) => {
         state.mouseX = coords.x;
         state.mouseY = coords.y;
-    });
+    }, updateCanvas);
     state.interactionsStarted = true;
 }
-// Version 2 of createAndStartVideoElement
+
 function initializeImageCapture(media: MediaStream) {
-    console.log('initializeImageCapture()')
+    // console.log('initializeImageCapture()')
     if (!state.videoElement) {
         const videoElement = state.videoElement || document.createElement('video');
         videoElement.style.visibility = 'hidden';
@@ -259,7 +294,7 @@ function initializeImageCapture(media: MediaStream) {
         document.body.appendChild(state.videoElement);
         state.videoElement.addEventListener('loadedmetadata', (event) => {
             if (!state.videoElement) return;
-            console.log("Video element loaded! event: ", event);
+            // console.log("Video element loaded! event: ", event);
             const videoWidth = state.videoElement.videoWidth;
             state.scale = videoWidth / window.innerWidth;
             if (!state.gridDrawn) {
@@ -274,24 +309,25 @@ function initializeImageCapture(media: MediaStream) {
 }
 
 function onImageCaptureBegin() {
-    console.log('onImageCaptureBegin');
+    // console.log('onImageCaptureBegin');
     const { ctx, videoElement, offscreenCtx, offscreenCanvas, media } = state;
+    // const [initialized, setInitialized] = useCrann('initialized');
     if (!ctx || !videoElement || !offscreenCtx || !offscreenCanvas) return;
 
     const cropRegion = cropImage(videoElement.videoWidth, videoElement.videoHeight, window.innerWidth, window.innerHeight);
     offscreenCanvas.height = videoElement.videoHeight;
     offscreenCanvas.width = videoElement.videoWidth;
     offscreenCtx.drawImage(videoElement, cropRegion.x, cropRegion.y, cropRegion.width, cropRegion.height, 0, 0, cropRegion.width, cropRegion.height);
-    // console.log(offScreenCtx);
+    // // console.log(offScreenCtx);
     state.initialized = true;
     media!.getVideoTracks()[0].stop();
     showCanvases(true);
-    console.log('onImageCapture finished. Setting initialized to true.');
-    state.weirwood!.set({ initialized: true });
+    // console.log('onImageCapture finished. Setting initialized to true.');
+    setInitialized(true);
 }
 
 async function stopRecording() {
-    console.log('stopRecording()');
+    // console.log('stopRecording()');
     const { canvas, ctx, gridCtx, gridCanvas, videoElement, media } = state;
     tabsManager.setTabRecording(state.myTabId!, false);
     media!.getVideoTracks()[0].stop();
@@ -314,54 +350,32 @@ async function stopRecording() {
         document.body.removeChild(state.handle);
         state.handle = null;
     }
+    if (state.ringHandle) {
+        document.body.removeChild(state.ringHandle);
+        state.ringHandle = null;
+    }
     interactions.stopIxn();
-    state.weirwood!.set({ active: false, mediaStreamId: null });
+    setActive(false);
+    setMediaStreamId(null);
+    // state.weirwood!.set({ active: false, mediaStreamId: null });
 }
 
-// Called every frame.. Could be optimized to only call on mouse move, or image capture
 function updateCanvas() {
-    const { canvas, ctx, offscreenCanvas, videoElement, initialized, scale, mouseX, mouseY } = state;
-    if (!videoElement || !ctx || !canvas || !offscreenCanvas || !initialized) {
-        console.log("updateCanvas skipped, initialized: ", initialized);
-        return;
-    }
-    if (initialized) {
-
-        // Draw the distorted image onto the fisheye canvas
-        // state.ctx!.drawImage(fisheyeImage, 0, 0, state.canvas!.width, state.canvas!.height);
-        ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-        const canvasXAdjust = CANVAS_SIZE / (state.zoom * 2);
-        const canvasYAdjust = CANVAS_SIZE / (state.zoom * 2);
-
-        const cropX = (mouseX * scale) - canvasXAdjust;
-        const cropY = (mouseY * scale) - canvasYAdjust;
-
-        ctx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / state.zoom, CANVAS_SIZE / state.zoom, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-        updateSelectedPixel();
-    }
-    requestAnimationFrame(updateCanvas);
-}
-
-// Called every frame.. Could be optimized to only call on mouse move, or image capture
-let image: HTMLImageElement;
-let distorter: any;
-function updateCanvas2() {
     const { canvas, ctx, fisheyeCanvas, offscreenCanvas, interCanvas, interCtx, videoElement, initialized, scale, mouseX, mouseY } = state;
     if (!videoElement || !ctx || !canvas || !interCanvas || !interCtx || !offscreenCanvas || !fisheyeCanvas || !initialized) {
-        console.log("updateCanvas skipped, initialized: ", initialized);
-        return;
+        // console.log("updateCanvas skipped, initialized: ", initialized);
+        return Date.now();
     }
-    if (initialized && !distorter) {
-        distorter = FisheyeGl({
+    if (initialized && !state.distorter) {
+        // console.log("Initializing distorter!")
+        state.distorter = FisheyeGl({
             selector: '#lensor-fisheye-canvas',
             lens: {
                 a: 1,    // 0 to 4;  default 1
                 b: 1,    // 0 to 4;  default 1
-                Fx: 0.15, // 0 to 4;  default 0.0
-                Fy: 0.15, // 0 to 4;  default 0.0
-                scale: 1 // 0 to 20; default 1.5
+                Fx: -0.15, // 0 to 4;  default 0.0
+                Fy: -0.15, // 0 to 4;  default 0.0
+                scale: 1.05 // 0 to 20; default 1.5
             },
             fov: {
                 x: 1, // 0 to 2; default 1
@@ -380,34 +394,22 @@ function updateCanvas2() {
         const cropX = (mouseX * scale) - canvasXAdjust;
         const cropY = (mouseY * scale) - canvasYAdjust;
 
-        interCtx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / state.zoom, CANVAS_SIZE / state.zoom, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        // fisheyeCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        // fisheyeCtx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / state.zoom, CANVAS_SIZE / state.zoom, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        const fisheyeImageDataUrl = interCanvas.toDataURL();
-        if (!image) {
-            image = new Image();
-            image.src = fisheyeImageDataUrl;
-            const imageWindow = document.getElementById('image-window');
-            // imageWindow!.style.backgroundImage = 'url(' + distorter.getCanvasDataUrl() + ')';
-            imageWindow!.style.backgroundImage = 'url(' + image.src + ')';
-        }
-        // image.src = fisheyeImageDataUrl;
-        // const imageWindow = document.getElementById('image-window');
-        // image.onload = function () {
-        // Initialize fisheyeGl with the loaded image
-        distorter.setImage(fisheyeImageDataUrl);
-        // distorter.run();
-        // const fisheyeImage = distorter.getCanvasDataUrl();
+        if (state.fisheyeOn) {
+            interCtx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / state.zoom, CANVAS_SIZE / state.zoom, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            const fisheyeImageDataUrl = interCanvas.toDataURL();
 
-        ctx.drawImage(distorter.getCanvas(), 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        // };
+            state.distorter!.setImage(fisheyeImageDataUrl);
+            ctx.drawImage(state.distorter!.getCanvas(), 0, 0);
+        } else {
+            ctx.drawImage(offscreenCanvas, cropX, cropY, CANVAS_SIZE / state.zoom, CANVAS_SIZE / state.zoom, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        }
+
         updateSelectedPixel();
     }
-    requestAnimationFrame(updateCanvas2);
+    return Date.now();
 }
 
 function updateSelectedPixel() {
-    //console.log("updateSelectedPixel()");
     const { prevCoords, mouseX, mouseY } = state;
     if (mouseX !== prevCoords.x || mouseY !== prevCoords.y) {
         state.prevCoords = { x: mouseX, y: mouseY };
@@ -415,30 +417,28 @@ function updateSelectedPixel() {
         const rgb = `rgb(${pixel.data[0]}, ${pixel.data[1]}, ${pixel.data[2]})`;
         state.selectedPixelColor = rgb;
         state.canvas!.style.border = `8px solid ${rgb}`;
-        state.handle!.style.setProperty('--before-background-color', rgb);
+        state.ringHandle!.style.setProperty('--before-background-color', rgb);
     }
 }
 
 function showCanvases(visible: boolean) {
-    console.log("showCanvases(", visible, ")");
-
+    // console.log("showCanvases(", visible, ")");
     if (visible) {
         for (let canvas of state.canvases) {
             canvas!.style.display = 'block';
             canvas!.style.visibility = 'visible';
-            updateCanvas2();
         }
+        updateCanvas();
     } else {
         for (let canvas of state.canvases) {
             canvas!.style.display = 'none';
             canvas!.style.visibility = 'hidden';
         }
     }
-
 }
 
 function createMainCanvas() {
-    console.log("createMainCanvas()");
+    // console.log("createMainCanvas()");
     const canvas = document.createElement('canvas');
     assignCanvasProps(canvas, MainCanvasProps);
     document.body.appendChild(canvas);
@@ -449,7 +449,7 @@ function createMainCanvas() {
 
 
 function createFisheyeCanvas() {
-    console.log("createFisheyeCanvas()");
+    // console.log("createFisheyeCanvas()");
     const fisheyeCanvas = document.createElement('canvas');
     assignCanvasProps(fisheyeCanvas, FisheyeCanvasProps);
     document.body.appendChild(fisheyeCanvas);
@@ -458,8 +458,96 @@ function createFisheyeCanvas() {
     state.canvases.push(fisheyeCanvas);
 }
 
+
+async function createButton() {
+    const buttonSegment = document.createElement('div');
+    const buttonSegmentImage = document.createElement('div');
+    const infoScroll = document.createElement('div');
+    infoScroll.className = 'info-scroll';
+    buttonSegment.id = "lensor-btn-segment";
+    buttonSegment.className = 'button-segment';
+    buttonSegmentImage.id = "lensor-btn-segment-img";
+    buttonSegmentImage.className = 'button-segment-img';
+    buttonSegment.appendChild(buttonSegmentImage);
+
+    state.ringHandle!.appendChild(buttonSegment);
+    document.body.appendChild(infoScroll);
+
+    await loadHtmlTemplate('toggle-switch', infoScroll);
+    state.toggleGridInput = document.getElementById('toggle-grid') as HTMLInputElement;
+    if (state.toggleGridInput) {
+        state.toggleGridInput!.addEventListener('click', () => {
+            state.gridOn = !state.gridOn;
+            drawGrid(state.scale * state.zoom);
+        })
+    } else {
+        // console.log("No toggle grid input!");
+    }
+
+    state.toggleFisheyeInput = document.getElementById('toggle-fisheye') as HTMLInputElement;
+    if (state.toggleFisheyeInput) {
+        state.toggleFisheyeInput!.addEventListener('click', () => {
+            state.fisheyeOn = !state.fisheyeOn;
+        })
+    } else {
+        // console.log("No toggle grid input!");
+    }
+
+
+    state.buttonSegment = buttonSegment;
+    state.infoScroll = infoScroll;
+
+    buttonSegmentImage.addEventListener('click', () => {
+        // console.log("buttonSegmentImage clicked!")
+        if (infoScroll.classList.contains('open')) {
+            state.infoScroll!.classList.remove('open');
+        } else {
+            state.infoScroll!.classList.add('open');
+        }
+    });
+
+
+    // const ctx = buttonCanvas.getContext("2d");
+    // const w = buttonCanvas.width = 200;
+    // const h = buttonCanvas.height = 200;
+
+    // const noiseSpeed = 0.005;
+    // const noiseScale = 100;
+    // const dotSize = 4;
+    // const gap = 1;
+    // const hueBase = 200;
+    // const hueRange = 60;
+    // const shape = 0;
+
+    // function draw() {
+    //     let nt = 0;
+    //     for (let x = 0; x < w; x += dotSize + gap) {
+    //         for (let y = 0; y < h; y += dotSize + gap) {
+    //             const noise = mkSimplexNoise(Math.random);
+    //             const yn = (noise.noise3D(y / noiseScale, x / noiseScale, nt) as number) * 20;
+    //             const cn = lerp(hueRange, yn * hueRange, 0.2);
+
+    //             ctx!.beginPath();
+    //             ctx!.fillStyle = `hsla(${hueBase + cn},50%,50%,${yn})`;
+    //             ctx!.fillRect(x, y, dotSize, dotSize);
+    //             ctx!.closePath();
+    //         }
+    //     }
+    // }
+
+    // function lerp(x1: number, x2: number, n: number) {
+    //     return (1 - n) * x1 + n * x2;
+    // }
+
+    // draw();
+
+    // const dataURL = buttonCanvas.toDataURL();
+    // buttonSegmentImage.style.backgroundImage = "url(" + dataURL + ")";
+    // document.body.appendChild(buttonContainer);
+}
+
 function createIntermediaryCanvas() {
-    console.log("createMainCanvas()");
+    // console.log("createMainCanvas()");
     const canvas = document.createElement('canvas');
     assignCanvasProps(canvas, IntermediaryCanvasProps);
     document.body.appendChild(canvas);
@@ -469,7 +557,7 @@ function createIntermediaryCanvas() {
 }
 
 function createOffscreenCanvas() {
-    console.log("createOffscreenCanvas()");
+    // console.log("createOffscreenCanvas()");
     const offscreenCanvas = document.createElement('canvas');
     offscreenCanvas.id = 'lensor-offscreen-canvas';
     offscreenCanvas.style.visibility = 'hidden';
@@ -482,21 +570,17 @@ function createOffscreenCanvas() {
 }
 
 function createHandle() {
-    console.log("createHandle()");
-    const handle = document.createElement('div');
-    handle.id = 'lensor-handle';
-    document.body.appendChild(handle);
-    state.handle = handle;
-    state.canvases.push(handle);
-
-    console.log("createImageWindow()");
-    const imageWindow = document.createElement('div');
-    imageWindow.id = 'image-window';
-    document.body.appendChild(imageWindow);
+    // console.log("createHandle()");
+    const ringHandle = document.createElement('div');
+    ringHandle.id = 'lensor-ring';
+    ringHandle.className = 'circle-ring';
+    document.body.appendChild(ringHandle);
+    state.ringHandle = ringHandle;
+    state.canvases.push(ringHandle);
 }
 
 function createGridCanvas() {
-    console.log("createGridCanvas()");
+    // console.log("createGridCanvas()");
     const gridCanvas = document.createElement('canvas');
     assignCanvasProps(gridCanvas, GridCanvasProps);
     document.body.appendChild(gridCanvas);
@@ -506,30 +590,35 @@ function createGridCanvas() {
 }
 
 function drawGrid(spacing: number) {
-    console.log("drawGrid()");
     const { gridCtx, gridCanvas } = state;
     if (!gridCtx || !gridCanvas) return;
-    gridCtx.strokeStyle = '#000000'; // Grid line color
-    gridCtx.lineWidth = .5;
-    gridCtx.beginPath();
+    if (state.gridOn) {
+        // console.log("drawGrid()");
+        gridCtx.strokeStyle = '#000000'; // Grid line color
+        gridCtx.lineWidth = .5;
+        gridCtx.beginPath();
 
-    // Vertical lines
-    for (let x = 0; x <= gridCanvas.width; x += spacing) {
-        gridCtx.moveTo(x, 0);
-        gridCtx.lineTo(x, gridCanvas.height);
+        // Vertical lines
+        for (let x = 0; x <= gridCanvas.width; x += spacing) {
+            gridCtx.moveTo(x, 0);
+            gridCtx.lineTo(x, gridCanvas.height);
+        }
+
+        // Horizontal lines
+        for (let y = 0; y <= gridCanvas.height; y += spacing) {
+            gridCtx.moveTo(0, y);
+            gridCtx.lineTo(gridCanvas.width, y);
+        }
+
+        gridCtx.stroke();
+    } else {
+        gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
     }
 
-    // Horizontal lines
-    for (let y = 0; y <= gridCanvas.height; y += spacing) {
-        gridCtx.moveTo(0, y);
-        gridCtx.lineTo(gridCanvas.width, y);
-    }
-
-    gridCtx.stroke();
 }
 
 function drawCrosshairs() {
-    console.log("drawCrosshairs()");
+    // console.log("drawCrosshairs()");
     const { gridCtx, gridCanvas } = state;
     if (!gridCtx || !gridCanvas) return;
 
@@ -578,7 +667,7 @@ function saveAsPNG(canvas: HTMLCanvasElement) {
 }
 
 function formatDateTime(date: Date): string {
-    console.log("formatDateTime()");
+    // console.log("formatDateTime()");
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     const hours = date.getHours().toString().padStart(2, '0');
@@ -592,8 +681,8 @@ function cropImage
         windowWidth: number,
         windowHeight: number
     ): { x: number, y: number, width: number, height: number } {
-    console.log("cropImage()");
-    console.log(`Crop image, canvasWidth: ${canvasWidth}, canvasHeight: ${canvasHeight}, windowWidth: ${windowWidth}, windowHeight: ${windowHeight}`)
+    // console.log("cropImage()");
+    // console.log(`Crop image, canvasWidth: ${canvasWidth}, canvasHeight: ${canvasHeight}, windowWidth: ${windowWidth}, windowHeight: ${windowHeight}`)
     let scaleFactor, newWidth, newHeight;
 
     // Determine the dominant dimension

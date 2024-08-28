@@ -43,13 +43,9 @@ function onScrollListener(event: Event) {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         scrollDelta += scrollTop - lastScrollTop;
 
-        // console.log('Scroll Delta:', scrollDelta);
-
         lastScrollTop = scrollTop;
-        if (scrollDelta > 1) {
-            // console.log("Scroll event was trusted.")
-            if (initialScroll || event.timeStamp < 10000) {
-                initialScroll = false;
+        if (Math.abs(scrollDelta) > 1) {
+            if (event.timeStamp < 9000) {
                 return;
             }
             if (debounceTimeout) {
@@ -57,7 +53,8 @@ function onScrollListener(event: Event) {
             }
 
             debounceTimeout = setTimeout(() => {
-                console.log("Scroll event debounced. Re capturing screen");
+                console.log("Scroll event debounced. Math.abs(scrollDelta): ", Math.abs(scrollDelta));
+                console.log("Scroll event timestamp: ", event.timeStamp);
                 scrollDelta = 0;
                 interactionState.handleScroll?.();
             }, debounceDelay);

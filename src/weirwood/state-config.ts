@@ -1,4 +1,4 @@
-import { Partition } from "weirwood";
+import { Partition } from 'crann'
 
 export const LensorStateConfig = {
     active: {

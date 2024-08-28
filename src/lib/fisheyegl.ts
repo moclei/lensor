@@ -32,7 +32,7 @@ interface Options {
   animate?: boolean;
 }
 
-interface FisheyeGl {
+export interface Fisheye {
   options: Options;
   gl: WebGLRenderingContext;
   lens: Lens;
@@ -46,7 +46,7 @@ interface FisheyeGl {
 
 const CONTEXT_TYPES: string[] = ["webgl", "experimental-webgl", "webkit-3d", "moz-webgl"];
 
-function FisheyeGl(options: Options): FisheyeGl {
+function FisheyeGl(options: Options): Fisheye {
   // Defaults:
   options = options || {};
 
@@ -103,6 +103,11 @@ function FisheyeGl(options: Options): FisheyeGl {
   const uLensF: WebGLUniformLocation | null = gl.getUniformLocation(program, "uLensF");
   const uFov: WebGLUniformLocation | null = gl.getUniformLocation(program, "uFov");
 
+  const texture: WebGLTexture | null = gl.createTexture();
+  if (!texture) {
+    throw new Error("texture is null");
+  }
+
   let vertexBuffer: WebGLBuffer | null;
   let indexBuffer: WebGLBuffer | null;
   let textureBuffer: WebGLBuffer | null;
@@ -135,7 +140,6 @@ function FisheyeGl(options: Options): FisheyeGl {
     if (!canvas) {
       throw new Error("there is no canvas on this page");
     }
-
 
     for (var i = 0; i < CONTEXT_TYPES.length; ++i) {
       let gl: WebGLRenderingContext | null;
@@ -222,8 +226,7 @@ function FisheyeGl(options: Options): FisheyeGl {
     }
   }
 
-  function loadImage(gl: WebGLRenderingContext, img: HTMLImageElement, callback?: (error: Error | null, texture: WebGLTexture) => void, texture: WebGLTexture | null = null): WebGLTexture {
-    texture = texture || gl.createTexture();
+  function loadImage(gl: WebGLRenderingContext, img: HTMLImageElement, callback?: (error: Error | null, texture: WebGLTexture) => void,): void {
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
 
@@ -237,23 +240,22 @@ function FisheyeGl(options: Options): FisheyeGl {
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     if (callback) callback(null, texture!);
-    return texture!;
   }
 
-  function loadImageFromUrl(gl: WebGLRenderingContext, url: string, callback?: () => void): WebGLTexture | null {
-    const texture: WebGLTexture | null = gl.createTexture();
-    var img: HTMLImageElement = new Image();
+  function loadImageFromUrl(gl: WebGLRenderingContext, url: string, callback?: () => void): void {
+    const img: HTMLImageElement = new Image();
     img.addEventListener("load", function onload() {
-      loadImage(gl, img, callback, texture);
-      options.width = img.width;
-      options.height = img.height;
-      resize(
-        options.width,
-        options.height
-      )
+      if (img) {
+        loadImage(gl, img, callback);
+        options.width = img.width;
+        options.height = img.height;
+        resize(
+          options.width,
+          options.height
+        )
+      }
     });
     img.src = url;
-    return texture;
   }
 
   function run(animate: boolean, callback?: () => void) {
@@ -318,10 +320,8 @@ function FisheyeGl(options: Options): FisheyeGl {
     gl.drawElements(gl.TRIANGLES, model.indices.length, gl.UNSIGNED_SHORT, 0);
   }
 
-  let texture: WebGLTexture | null;
-
   function setImage(imageUrl: string, callback?: () => void) {
-    texture = loadImageFromUrl(gl, imageUrl, function onImageLoad() {
+    loadImageFromUrl(gl, imageUrl, function onImageLoad() {
 
       run(options.animate!, callback);
 
@@ -354,7 +354,7 @@ function FisheyeGl(options: Options): FisheyeGl {
 
 
   // external API:
-  var distorter: FisheyeGl = {
+  return {
     options: options,
     gl: gl,
     lens: lens,
@@ -365,8 +365,6 @@ function FisheyeGl(options: Options): FisheyeGl {
     getCanvasDataUrl: getCanvasDataUrl,
     getCanvas: getCanvas,
   }
-
-  return distorter;
 
 }
 
