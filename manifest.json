@@ -1,17 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Lensor",
-  "version": "1.43.503",
+  "version": "1.43.1562",
   "description": "A lense for viewing your pixels",
   "permissions": [
     "tabCapture",
     "tabs",
-    "storage"
+    "storage",
+    "scripting",
+    "history",
+    "favicon",
+    "contextMenus",
+    "sidePanel"
   ],
-  "type": "module",
   "host_permissions": [
-    "http://*.google.com/*",
-    "https://*.google.com/*"
+    "*://*/*"
   ],
   "background": {
     "service_worker": "service-workers/service-worker.js"
@@ -19,11 +22,32 @@
   "content_scripts": [
     {
       "matches": [
-        "http://*.google.com/*",
-        "https://*.google.com/*"
+        "*://*/*"
       ],
       "js": [
         "scripts/content-script.js"
+      ],
+      "css": [
+        "styles/handle.css",
+        "templates/toggle-switch/toggle-switch.css"
+      ]
+    }
+  ],
+  "devtools_page": "devtools/devtools_base.html",
+  "side_panel": {
+    "default_path": "templates/sidepanel/sidepanel.html"
+  },
+  "chrome_url_overrides": {
+    "history": "templates/history/history.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "templates/toggle-switch/toggle-switch.html",
+        "test2.png"
+      ],
+      "matches": [
+        "*://*/*"
       ]
     }
   ],

@@ -1,12 +1,24 @@
 {
   "compilerOptions": {
     "target": "es6",
+    "lib": [
+      "es2020",
+      "dom"
+    ],
     "module": "es6",
     "moduleResolution": "node",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "porter-source": [
+        "../porter-source/dist"
+      ],
+      "crann": [
+        "../crann/dist"
+      ],
+    },
   },
   "include": [
     "src/**/*"

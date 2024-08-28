@@ -18,12 +18,22 @@
   "author": "Marc O'Cleirig",
   "license": "MIT",
   "dependencies": {
+    "@spissvinkel/simplex-noise": "^1.0.1",
+    "@types/node": "^20.12.12",
     "chokidar": "^3.5.3",
-    "esbuild": "^0.19.9"
+    "crann": "^1.0.9",
+    "esbuild": "^0.19.9",
+    "fisheyegl": "^0.1.2",
+    "porter-source": "^1.0.19",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.254",
     "@types/d3": "^7.4.3",
+    "@types/react": "^18.3.4",
+    "@types/react-dom": "^18.3.0",
+    "@types/webextension-polyfill": "^0.10.7",
     "@typescript-eslint/eslint-plugin": "^6.13.2",
     "@typescript-eslint/parser": "^6.13.2",
     "d3": "^7.8.5",
@@ -32,6 +42,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.0.1",
     "prettier": "^3.1.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "webextension-polyfill": "^0.12.0"
   }
 }

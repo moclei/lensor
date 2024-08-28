@@ -2,17 +2,20 @@ import esbuild from 'esbuild';
 import chokidar from 'chokidar';
 import fs from 'fs';
 import path from 'path';
-
+import {exec} from 'child_process';
 const srcDir = './src';
 const distDir = './dist';
 const manifestPath = './manifest.json';
 
 const entryPoints = [
     './src/scripts/content-script.ts',
-    './src/service-workers/service-worker.ts'
+    './src/service-workers/service-worker.ts',
+    './src/scripts/history.ts',
+    './src/scripts/sidepanel.ts',
 ];
 const assets = ['./src/assets'];
 
+const devtools = ['./src/devtools'];
 // Function to ensure directory exists
 const ensureDirExists = (dir) => {
     if (!fs.existsSync(dir)) {
@@ -58,6 +61,29 @@ const build = () => {
         format: 'esm'
     }).catch(() => process.exit(1));
 
+    esbuild.build({
+        entryPoints: ['./src/devtools/devtools.tsx'],
+        outfile: 'dist/devtools/index.js',
+        bundle: true,
+        minify: true,
+        sourcemap: true,
+        target: ['chrome58', 'firefox57'],
+        loader: { '.ts': 'ts', '.tsx': 'tsx' },
+        define: {
+          'process.env.NODE_ENV': '"production"'
+        },
+    }).catch(() => process.exit(1));
+
+    // esbuild.build({
+    //     entryPoints: ['./src/lib/fisheyegl.js',],
+    //     outdir: './dist/lib',
+    //     bundle: true,
+    //     minify: false,
+    //     sourcemap: true,
+    //     format: 'esm'
+    // }).catch(() => process.exit(1));
+
+    // Copy assets
     assets.forEach(assetDir => {
         fs.readdirSync(assetDir).forEach(file => {
             const srcPath = path.join(assetDir, file);
@@ -66,6 +92,16 @@ const build = () => {
         });
     });
 
+    devtools.forEach(assetDir => {
+        fs.readdirSync(assetDir).forEach(file => {
+            if (file.endsWith('.html') || file.endsWith('.css')) {
+                const srcPath = path.join(assetDir, file);
+                ensureDirExists(path.join(distDir, 'devtools'));
+                const destPath = path.join(distDir, 'devtools', file);
+                copyRecursiveSync(srcPath, destPath);
+            }
+        });
+    });
     // Copy HTML and CSS to dist
     fs.readdirSync(srcDir).forEach(file => {
         if (file.endsWith('.html') || file.endsWith('.css')) {
@@ -73,6 +109,7 @@ const build = () => {
         }
     });
 
+    //triggerKeyboardMaestroMacro();
     copyManifest();
 };
 
@@ -81,7 +118,26 @@ build();
 
 // Watch for file changes in src directory
 chokidar.watch(srcDir).on('change', (event, path) => {
-    console.log(`File ${path} has been changed`);
+    console.log(`Rebuilding => File ${event} has been changed`);
     build();
 });
+
+function triggerKeyboardMaestroMacro() {
+    const script = `
+        tell application "Keyboard Maestro Engine"
+            do script "52E810AA-4A52-4E4F-8244-D75FD150D49B"
+        end tell
+    `;
+    exec(`osascript -e '${script}'`, (err, stdout, stderr) => {
+        if (err) {
+            console.error(err);
+            return;
+        }
+        if (stderr) {
+            console.error(stderr);
+            return;
+        }
+        console.log(stdout);
+    });
+}
 
