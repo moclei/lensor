@@ -13,4 +13,20 @@ export const LensorStateConfig = {
         default: null as string | null,
         partition: Partition.Instance
     },
+    isSidepanelShown: {
+        default: false,
+        partition: Partition.Instance
+    },
+    hoveredColor: {
+        default: 'rgb(87, 102, 111)',
+        partition: Partition.Common
+    },
+    showGrid: {
+        default: true,
+        partition: Partition.Common
+    },
+    showFisheye: {
+        default: true,
+        partition: Partition.Common
+    },
 }

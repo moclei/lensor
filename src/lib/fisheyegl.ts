@@ -26,6 +26,7 @@ interface Options {
   fov?: Fov;
   image?: string;
   selector?: string;
+  canvas: HTMLCanvasElement | null;
   vertexSrc?: string;
   fragmentSrc?: string;
   runner?: (dt: number) => void;
@@ -88,6 +89,7 @@ function FisheyeGl(options: Options): Fisheye {
   const image: string = options.image || "images/barrel-distortion.png";
 
   const selector: string = options.selector || "#canvas";
+  const canvas: HTMLCanvasElement | null = options.canvas || null;
   const gl: WebGLRenderingContext = getGLContext(selector);
 
   const vertexSrc: string = loadFile(options.vertexSrc || "vertex");
@@ -135,7 +137,7 @@ function FisheyeGl(options: Options): Fisheye {
 
   function getGLContext(selector: string): WebGLRenderingContext {
     console.log("getGLContext");
-    const canvas: HTMLCanvasElement | null = document.querySelector(selector);
+    const canvas: HTMLCanvasElement | null = options.canvas
 
     if (!canvas) {
       throw new Error("there is no canvas on this page");
