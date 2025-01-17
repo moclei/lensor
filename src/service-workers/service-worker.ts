@@ -1,27 +1,34 @@
 import tabsMan from './tabs/tabs-manager';
 import { create, Partition } from 'crann';
 import { source, getMetadata, AgentMetadata, PorterContext } from 'porter-source';
+import { LensorStateConfig } from '../weirwood/state-config';
 
 console.log("lensor service worker created! version: ", chrome.runtime.getManifest().version);
 tabsMan.initialize();
 
 // Set up state with crann
-const [get, set, subscribe, findAgent] = create({
-    active: {
-        default: false,
-        partition: Partition.Instance
-    },
-    initialized: {
-        default: false,
-        partition: Partition.Instance
-    },
-    mediaStreamId: {
-        default: null as string | null,
-        partition: Partition.Instance
-    },
-});
+const [get, set, subscribe, findAgent] = create(LensorStateConfig);
 
-subscribe(async (state, changes, agentMeta) => {
+subscribe((state, changes, agentMeta) => {
+    if (changes.hasOwnProperty('isSidepanelShown')) {
+        console.log('changes has own property isSidepanelShown');
+        if (changes.isSidepanelShown === true) {
+            console.log('Opening a sidepanel!');
+            chrome.sidePanel.setOptions({
+                tabId: agentMeta?.location.index!,
+                path: 'sidepanel/sidepanel.html',
+                enabled: true
+            });
+            chrome.sidePanel.open({ tabId: agentMeta?.location.index! });
+        }
+        else {
+            chrome.sidePanel.setOptions({
+                tabId: agentMeta?.location.index!,
+                enabled: false
+            });
+        }
+
+    }
     if (!agentMeta) return;
     const { active, initialized, mediaStreamId } = state;
     const { location } = getMetadata(agentMeta.key)!;
@@ -29,11 +36,56 @@ subscribe(async (state, changes, agentMeta) => {
     if (active && !mediaStreamId) {
         console.log('Active but null media stream, create one.');
         // Get a MediaStream for the active tab.
-        const streamId = await (chrome.tabCapture as any).getMediaStreamId({
+        (chrome.tabCapture as any).getMediaStreamId({
             consumerTabId: location.index,
             targetTabId: location.index
+        }).then((streamId: string) => {
+            set({ mediaStreamId: streamId }, agentMeta.key);
         });
-        set({ mediaStreamId: streamId }, agentMeta.key);
+    }
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+    //console.log("Tab updated ", tabId, changeInfo, tab);
+    if (changeInfo.status == 'complete' && tab.status == 'complete' && tab.url != undefined) {
+        const key = findAgent(PorterContext.ContentScript, { index: tabId });
+        console.log("Did we find a key: ", key);
+        if (key && get(key).isSidepanelShown) {
+            console.log('tabs onUpdated isSidepanelShown');
+            await chrome.sidePanel.setOptions({
+                tabId,
+                path: 'sidepanel/sidepanel.html',
+                enabled: true
+            });
+        } else {
+            console.log('tabs onUpdated isSidepanelShown = false');
+            // Disables the side panel on all other sites
+            await chrome.sidePanel.setOptions({
+                tabId,
+                enabled: false
+            });
+        }
+    }
+});
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    console.log('Tab activated: ', activeInfo);
+    const key = findAgent(PorterContext.ContentScript, { index: activeInfo.tabId });
+    console.log('Did we find a key: ', key);
+    if (key && get(key).isSidepanelShown) {
+        console.log('tabs onActivated isSidepanelShown');
+        chrome.sidePanel.setOptions({
+            tabId: activeInfo.tabId,
+            path: 'sidepanel/sidepanel.html',
+            enabled: true
+        });
+    } else {
+        console.log('tabs onActivated isSidepanelShown = false');
+        // Disables the side panel on all other sites
+        chrome.sidePanel.setOptions({
+            tabId: activeInfo.tabId,
+            enabled: false
+        });
     }
 });
 
@@ -42,26 +94,24 @@ async function handleActionButtonClick(tab: chrome.tabs.Tab) {
     console.log('Action clicked, tab: ', tab);
     if (!tab.id) return;
 
-    post({ action: 'action-clicked', payload: null }, tab.id);
     const key = findAgent(PorterContext.ContentScript, { index: tab.id });
     if (!key) {
         console.warn('action button clicked but no agent found for that tab.');
+        chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['ui/index.js']
+        }).then(() => {
+            console.log('Injected ui script into tab: ', tab.id);
+            const key = findAgent(PorterContext.ContentScript, { index: tab.id! });
+            console.warn('Injected ui, did we find a key? ', key);
+            if (key) {
+                set({ active: true }, key);
+            }
+        });
         return;
-    }
-    const { active, initialized } = get(key);
-    set({ active: !active }, key);
-    if (!initialized) {
-        console.log('Not initialized, starting app.');
-        chrome.tabs.sendMessage(tab.id, {
-            type: 'start-app',
-            tabId: tab.id
-        });
     } else {
-        console.log('Initialized, stopping app.');
-        chrome.tabs.sendMessage(tab.id, {
-            type: 'stop-app',
-            tabId: tab.id
-        });
+        const { active, initialized } = get(key);
+        set({ active: !active }, key);
     }
 }
 
@@ -71,6 +121,10 @@ onConnect(handlePorterConnect);
 setMessages({
     hello_back: (message, agent) => {
         console.log('Received hello_back message: ', message, agent);
+    },
+    settings_clicked: (message, agent) => {
+        console.log('Received settings_clicked message: ', message, agent);
+        chrome.sidePanel.open({ tabId: agent?.location.index! });
     }
 });
 // porter.onConnect.addListener(handlePorterConnect);
@@ -110,28 +164,8 @@ chrome.runtime.onInstalled.addListener(async (details: chrome.runtime.InstalledD
         });
     }
 
-    //Setup sidepanel context menu
-    setupContextMenu();
 });
 
-function setupContextMenu() {
-    console.log('setting up context menus')
-    chrome.contextMenus.create({
-        id: 'define-word-lensor',
-        title: 'Define A Word',
-        type: 'normal',
-        contexts: ['page']
-    });
-}
-
-
-chrome.contextMenus.onClicked.addListener((data, tab) => {
-    // Store the last word in chrome.storage.session.
-    chrome.storage.session.set({ lastWord: data.selectionText });
-
-    // Make sure the side panel is open.
-    chrome.sidePanel.open({ tabId: tab!.id! });
-});
 
 chrome.action.onClicked.addListener(handleActionButtonClick);
 

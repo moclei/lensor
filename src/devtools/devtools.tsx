@@ -6,7 +6,7 @@ import { connect } from "porter-source";
 
 let count = 0;
 
-chrome.devtools.panels.create("Lensor", "icons/icon-48.png", "devtools/devtools.html", function (panel) {
+chrome.devtools.panels.create("Lensor", "icons/icon-48.png", "devtools.html", function (panel) {
     console.log('Devtools panel created!');
     panel.onShown.addListener(function (win) {
         const root = ReactDOM.createRoot(win.document.getElementById('root') as HTMLElement);
