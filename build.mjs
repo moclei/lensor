@@ -75,8 +75,8 @@ const build = () => {
     });
 
 
-     // Copy assets
-
+     // Copy sidepanel assets
+     ensureDirExists(path.join(distDir, 'sidepanel'));
         fs.readdirSync(sidepanelDir).forEach(file => {
             if (file.endsWith('.html') ) {
                 fs.copyFileSync(`${srcDir}/sidepanel/${file}`, `${distDir}/sidepanel/${file}`);
