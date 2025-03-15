@@ -19,22 +19,22 @@ export const LensorStateConfig = {
   },
   hoveredColor: {
     default: 'rgb(87, 102, 111)',
-    partition: Partition.Common
+    partition: Partition.Service
   },
   showGrid: {
     default: true,
-    partition: Partition.Common
+    partition: Partition.Service
   },
   showFisheye: {
     default: true,
-    partition: Partition.Common
+    partition: Partition.Service
   },
   zoom: {
     default: 2,
-    partition: Partition.Common
+    partition: Partition.Service
   },
   pixelScalingEnabled: {
     default: true,
-    partition: Partition.Common
+    partition: Partition.Service
   }
 };

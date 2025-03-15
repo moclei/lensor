@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lensor",
-  "version": "1.44.300",
+  "version": "1.44.537",
   "description": "A lense for viewing your pixels",
   "permissions": [
     "tabCapture",

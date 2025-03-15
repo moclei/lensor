@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import Color from '../colors/Color';
-import { useLensorState } from '../../../ui/hook/useLensorState';
-import { PorterContext } from 'porter-source';
+import { useLensorState } from '../../../ui/hooks/useLensorState';
 import Checkbox from '../../components/checkbox/Checkbox';
 import ZoomControl from '../zoom-control/ZoomControl';
 
@@ -21,15 +20,10 @@ const SettingRow = styled.div`
   display: flex;
 `;
 
-// const Checkbox = styled.input`
-//     margin: 0 8px;
-//     padding: 0;
-//     `;
-
 interface HomeProps {}
 
 const Home: React.FC<HomeProps> = () => {
-  const { useStateItem } = useLensorState(PorterContext.React);
+  const { useStateItem } = useLensorState();
   const [isGridShown, setIsGridShown] = useStateItem('showGrid');
   const [isFisheyeShown, setFisheyeShown] = useStateItem('showFisheye');
   const [zoomLevel, setZoomLevel] = useStateItem('zoom');

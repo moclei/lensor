@@ -5,7 +5,7 @@ interface UseDraggableOptions {
   dragItemsRefs: React.RefObject<HTMLElement>[];
   offset: number;
   updateCanvas: (coords: { x: number; y: number }) => void;
-  drawCanvas: () => number;
+  drawCanvas: () => string | null;
 }
 
 export function useDraggable({

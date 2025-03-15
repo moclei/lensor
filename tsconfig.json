@@ -1,19 +1,31 @@
 {
   "compilerOptions": {
     "jsx": "react",
-    "target": "es6",
-    "lib": [
-      "es2020",
-      "dom"
-    ],
+    "target": "es2020",
+    "lib": ["es2020", "dom"],
     "module": "node16",
     "moduleResolution": "node16",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "baseUrl": "src",
+    "paths": {
+      "@/*": ["*"],
+      "@ui/*": ["ui/*"],
+      "@features/*": ["ui/features/*"],
+      "@utils/*": ["ui/utils/*"],
+      "@hooks/*": ["ui/hook/*"],
+      "@sidepanel/*": ["sidepanel/*"]
+    },
+    "outDir": "dist",
+    "sourceMap": true,
+    "declaration": true,
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "noImplicitAny": true,
+    "isolatedModules": true
   },
-  "include": [
-    "src/**/*"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

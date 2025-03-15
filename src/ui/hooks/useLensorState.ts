@@ -1,18 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { connect, connected, ConfigItem, DerivedState } from 'crann';
-import { LensorStateConfig } from '../../weirwood/state-config';
+import { connect, ConfigItem, DerivedState } from 'crann';
+import { LensorStateConfig } from '../state-config';
 
 export function createCrannStateHook<
   TConfig extends Record<string, ConfigItem<any>>
 >(config: TConfig) {
   return function useCrannState(context?: string) {
-    // console.log('useLensorState: useCrannState, context ', context);
     const [useCrann, get, set, subscribe] = useMemo(() => {
-      // console.log(
-      //   'useLensorState: Connecting to Crann with context : ',
-      //   context
-      // );
-      const instance = connect(config, context);
+      const instance = connect(config);
       return instance;
     }, [context]);
 
@@ -22,7 +17,7 @@ export function createCrannStateHook<
           get()[key]
         );
         const valueRef = useRef(value);
-        //console.log("useLensorState, useStateItem, key, initialValue ", key, value);
+
         useEffect(() => {
           valueRef.current = value;
         }, [value]);
@@ -30,8 +25,7 @@ export function createCrannStateHook<
         useEffect(() => {
           setValue(get()[key]);
           const unsubscribe = subscribe(
-            (changes) => {
-              // console.log('useLensorState: Changes received: ', changes);
+            (changes: DerivedState<TConfig>[K]) => {
               if (key in changes) {
                 const newValue = changes[key] as DerivedState<TConfig>[K];
                 setValue(changes[key] as DerivedState<TConfig>[K]);
@@ -39,7 +33,6 @@ export function createCrannStateHook<
             },
             [key]
           );
-
           return unsubscribe;
         }, [key]);
 
