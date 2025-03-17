@@ -22,19 +22,31 @@ export const LensorStateConfig = {
     partition: Partition.Service
   },
   showGrid: {
-    default: true,
+    default: false,
     partition: Partition.Service
   },
   showFisheye: {
-    default: true,
+    default: false,
     partition: Partition.Service
   },
   zoom: {
-    default: 2,
+    default: 1,
     partition: Partition.Service
   },
   pixelScalingEnabled: {
     default: true,
+    partition: Partition.Service
+  },
+  imageCropX: {
+    default: 0,
+    partition: Partition.Service
+  },
+  imageCropY: {
+    default: 0,
+    partition: Partition.Service
+  },
+  captureCount: {
+    default: 0,
     partition: Partition.Service
   }
 };

@@ -1,14 +1,20 @@
 import { styled } from 'styled-components';
 
-const DebugOverlay = styled.div`
+const StyledDebugOverlay = styled.div<{
+  lenseCenter: { x: number; y: number };
+}>`
   position: fixed;
   z-index: 9999997;
   background-color: rgba(255, 0, 0, 0.3);
   border: 1px solid red;
   pointer-events: none;
+  left: ${(props) => props.lenseCenter.x - 10}px;
+  top: ${(props) => props.lenseCenter.y - 10}px;
+  width: 20px;
+  height: 20px;
 `;
 
-const DebugInfo = styled.div`
+const StyledDebugInfo = styled.div`
   position: fixed;
   z-index: 9999999;
   right: 10px;
@@ -30,7 +36,10 @@ const MainCanvas = styled.canvas<{ borderColor: string }>`
   top: 10px;
   border-radius: 50%;
   border: 8px solid ${(props) => props.borderColor};
+  width: 400px;
+  height: 400px;
   overflow: hidden;
+  opacity: 0.3;
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
   image-rendering: pixelated;
 `;
@@ -145,8 +154,8 @@ const PixelScalingIndicator = styled.div`
 `;
 
 export {
-  DebugOverlay,
-  DebugInfo,
+  StyledDebugOverlay,
+  StyledDebugInfo,
   MainCanvas,
   GridCanvas,
   HiddenCanvas,

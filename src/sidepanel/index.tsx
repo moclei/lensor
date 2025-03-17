@@ -2,8 +2,6 @@ import { createRoot } from 'react-dom/client';
 import { StyleSheetManager } from 'styled-components';
 import React from 'react';
 import './index.css';
-import { connect } from 'crann';
-import { LensorStateConfig } from '../ui/state-config';
 import App from './App';
 
 const styles = {
@@ -19,8 +17,6 @@ const styles = {
 };
 
 console.log('Sidepanel: Lensor sidepanel container created');
-
-const [useCrann, get] = connect(LensorStateConfig);
 
 document.addEventListener('DOMContentLoaded', function () {
   initializeReactApp();

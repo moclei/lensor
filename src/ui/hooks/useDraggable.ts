@@ -6,6 +6,7 @@ interface UseDraggableOptions {
   offset: number;
   updateCanvas: (coords: { x: number; y: number }) => void;
   drawCanvas: () => string | null;
+  borderWidth?: number;
 }
 
 export function useDraggable({
@@ -13,10 +14,66 @@ export function useDraggable({
   dragItemsRefs,
   offset,
   updateCanvas,
-  drawCanvas
+  drawCanvas,
+  borderWidth = 0
 }: UseDraggableOptions) {
   const isDraggingRef = useRef(false);
   const lastPositionRef = useRef({ x: 0, y: 0 });
+
+  // Calculate boundary constraints
+  const calculateBoundaries = useCallback(() => {
+    const handle = handleRef.current;
+    if (!handle)
+      return {
+        minX: -Infinity,
+        maxX: Infinity,
+        minY: -Infinity,
+        maxY: Infinity
+      };
+
+    // Get the first draggable item (typically the main canvas)
+    const lensElement = dragItemsRefs.find((ref) => ref.current)?.current;
+    if (!lensElement)
+      return {
+        minX: -Infinity,
+        maxX: Infinity,
+        minY: -Infinity,
+        maxY: Infinity
+      };
+
+    const lensRect = lensElement.getBoundingClientRect();
+    const halfWidth = lensRect.width / 2;
+    const halfHeight = lensRect.height / 2;
+
+    return {
+      minX: -halfWidth + borderWidth,
+      maxX: window.innerWidth - halfWidth - borderWidth,
+      minY: -halfHeight + borderWidth,
+      maxY: window.innerHeight - halfHeight - borderWidth
+    };
+  }, [handleRef, dragItemsRefs, borderWidth]);
+
+  const constrainPosition = useCallback(
+    (newLeft: number, newTop: number) => {
+      const boundaries = calculateBoundaries();
+
+      const constrainedLeft = Math.max(
+        boundaries.minX,
+        Math.min(newLeft, boundaries.maxX)
+      );
+
+      const constrainedTop = Math.max(
+        boundaries.minY,
+        Math.min(newTop, boundaries.maxY)
+      );
+
+      return {
+        left: constrainedLeft,
+        top: constrainedTop
+      };
+    },
+    [calculateBoundaries]
+  );
 
   const updatePosition = useCallback(
     (deltaX: number, deltaY: number) => {
@@ -26,14 +83,16 @@ export function useDraggable({
       const newLeft = handle.offsetLeft + deltaX;
       const newTop = handle.offsetTop + deltaY;
 
-      handle.style.left = `${newLeft}px`;
-      handle.style.top = `${newTop}px`;
+      const { left, top } = constrainPosition(newLeft, newTop);
+
+      handle.style.left = `${left}px`;
+      handle.style.top = `${top}px`;
 
       dragItemsRefs.forEach((ref) => {
         const elem = ref.current;
         if (elem) {
-          elem.style.left = `${newLeft + parseInt(elem.dataset.offsetX || '0')}px`;
-          elem.style.top = `${newTop + parseInt(elem.dataset.offsetY || '0')}px`;
+          elem.style.left = `${left + parseInt(elem.dataset.offsetX || '0')}px`;
+          elem.style.top = `${top + parseInt(elem.dataset.offsetY || '0')}px`;
         }
       });
 
