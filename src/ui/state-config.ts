@@ -34,7 +34,7 @@ export const LensorStateConfig = {
     partition: Partition.Service
   },
   pixelScalingEnabled: {
-    default: true,
+    default: false,
     partition: Partition.Service
   },
   imageCropX: {

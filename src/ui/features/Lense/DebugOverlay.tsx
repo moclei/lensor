@@ -241,11 +241,11 @@ export const DebugOverlay: React.FC<{
           </>
         )}
       </StyledDebugInfo>
-      <DebugCanvas
+      {/* <DebugCanvas
         ref={debugCanvasRef}
         width={imageBitmap ? window.innerWidth * 0.3 : DEBUG_CANVAS_SIZE}
         height={imageBitmap ? window.innerHeight * 0.3 : DEBUG_CANVAS_SIZE}
-      />
+      /> */}
     </>
   );
 };

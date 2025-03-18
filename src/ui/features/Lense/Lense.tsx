@@ -19,22 +19,18 @@ import { useLenseCanvasUpdate } from '@/ui/hooks/useLenseCanvasUpdate';
 import { useGrid } from '@/ui/hooks/useGrid';
 import { DebugOverlay } from './DebugOverlay';
 import { useDebugInfo, useDebugMode } from '@/ui/utils/debug-utils';
+import { useMediaCapture } from '@/ui/hooks/useMediaCapture';
+import { usePageObservers } from '@/ui/hooks/usePageObserver';
 
 const CANVAS_SIZE = 400;
 
 interface LenseProps {
-  imageBitmap: ImageBitmap | null;
+  mediaStreamId: string | null;
   onStop: () => void;
   onClose: () => void;
-  onRequestNewCapture: () => void;
 }
 
-const Lense: React.FC<LenseProps> = ({
-  imageBitmap,
-  onStop,
-  onClose,
-  onRequestNewCapture
-}) => {
+const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const fisheyeCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,15 +38,11 @@ const Lense: React.FC<LenseProps> = ({
   const ringHandleRef = useRef<HTMLDivElement>(null);
   const infoScrollRef = useRef<HTMLDivElement>(null);
 
-  const [currentImage, setCurrentImage] = React.useState<ImageBitmap | null>(
-    imageBitmap
-  );
   const [canvasesVisible, setCanvasesVisible] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
   const [canvasesReady, setCanvasesReady] = useState(false);
   const [initialDrawComplete, setInitialDrawComplete] = useState(false);
-  const [captureKey, setCaptureKey] = useState(0);
 
   const { useStateItem } = useLensorState();
   const [isSidepanelShown, setIsSidepanelShown] =
@@ -64,6 +56,26 @@ const Lense: React.FC<LenseProps> = ({
 
   const { debugMode } = useDebugMode();
   const { debugInfo, setDebugInfo } = useDebugInfo();
+
+  const {
+    imageBitmap: currentImage,
+    isCapturing,
+    captureFrame,
+    error
+  } = useMediaCapture(mediaStreamId, active);
+
+  // Page observers hook
+  const { lastChangeTimestamp, lastScrollPosition } = usePageObservers(
+    () => {
+      if (active && mediaStreamId && !isCapturing) {
+        console.log(
+          'usePageObservers, significant change, calling captureFrame'
+        );
+        captureFrame();
+      }
+    },
+    { debounceTime: 300, threshold: 160 }
+  );
 
   const { updateCanvas, effectiveZoom } = useLenseCanvasUpdate({
     imageBitmap: currentImage,
@@ -88,28 +100,13 @@ const Lense: React.FC<LenseProps> = ({
   const { hoveredColor, contrastColor, updateSelectedColor } =
     useColorDetection();
 
-  // Listen for image updates from outside React
-  React.useEffect(() => {
-    const handleImageUpdate = (event: CustomEvent) => {
-      console.log('Received new image in Lense component');
-      setCurrentImage(event.detail.imageBitmap);
-    };
+  useEffect(() => {
+    console.log('Lense useEffect, currentImage: ', currentImage);
+  }, [currentImage]);
 
-    // Add event listener to the shadow root
-    const shadowRoot = document.querySelector('div')?.shadowRoot;
-    console.log('Lense, shadowRoot: ', shadowRoot);
-    shadowRoot?.addEventListener(
-      'lensor:image-update',
-      handleImageUpdate as EventListener
-    );
-
-    return () => {
-      shadowRoot?.removeEventListener(
-        'lensor:image-update',
-        handleImageUpdate as EventListener
-      );
-    };
-  }, []);
+  useEffect(() => {
+    console.log('Lense useEffect, active: ', active);
+  }, [active]);
 
   useEffect(() => {
     if (active && currentImage && !initialDrawComplete) {
@@ -127,10 +124,10 @@ const Lense: React.FC<LenseProps> = ({
       drawCrosshairs();
       showCanvases(true);
       setCanvasesReady(true);
-      setMousePos(canvasCenter);
+      // setMousePos(canvasCenter);
       setInitialDrawComplete(true);
     }
-  }, [active, currentImage, debugInfo, initialDrawComplete, captureKey]);
+  }, [active, currentImage, debugInfo, initialDrawComplete]);
 
   const getCanvasCenter = useCallback((): { x: number; y: number } => {
     const canvas = mainCanvasRef.current;
@@ -153,7 +150,7 @@ const Lense: React.FC<LenseProps> = ({
 
   useEffect(() => {
     if (canvasesReady && currentImage && mainCanvasRef.current) {
-      const updatedColor = updateCanvas(mousePos);
+      const updatedColor = updateCanvas();
       const detectedColor = detectPixelColor(mainCanvasRef);
       if (updatedColor) {
         updateSelectedColor(updatedColor);
@@ -183,7 +180,7 @@ const Lense: React.FC<LenseProps> = ({
     (visible: boolean) => {
       setCanvasesVisible(visible);
       if (visible) {
-        updateCanvas(mousePos);
+        updateCanvas();
       }
     },
     [updateCanvas]
@@ -209,7 +206,7 @@ const Lense: React.FC<LenseProps> = ({
         mousePosition: { x: coords.x, y: coords.y }
       });
     },
-    drawCanvas: () => updateCanvas(mousePos),
+    drawCanvas: () => updateCanvas(),
     borderWidth: 0
   });
 

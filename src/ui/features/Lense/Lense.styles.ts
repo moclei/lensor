@@ -1,5 +1,31 @@
 import { styled } from 'styled-components';
 
+// New unified container
+const LenseContainer = styled.div`
+  position: fixed;
+  z-index: 9999990;
+  right: 10px;
+  top: 10px;
+  width: 460px;
+  height: 460px;
+  pointer-events: none;
+`;
+
+const MainCanvas = styled.canvas<{ borderColor: string }>`
+  position: fixed;
+  z-index: 9999998;
+  right: 10px;
+  top: 10px;
+  border-radius: 50%;
+  border: 8px solid ${(props) => props.borderColor};
+  width: 400px;
+  height: 400px;
+  overflow: hidden;
+  opacity: 0.3;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+  image-rendering: pixelated;
+`;
+
 const StyledDebugOverlay = styled.div<{
   lenseCenter: { x: number; y: number };
 }>`
@@ -27,21 +53,6 @@ const StyledDebugInfo = styled.div`
   max-width: 300px;
   max-height: 200px;
   overflow: auto;
-`;
-
-const MainCanvas = styled.canvas<{ borderColor: string }>`
-  position: fixed;
-  z-index: 9999998;
-  right: 10px;
-  top: 10px;
-  border-radius: 50%;
-  border: 8px solid ${(props) => props.borderColor};
-  width: 400px;
-  height: 400px;
-  overflow: hidden;
-  opacity: 0.3;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-  image-rendering: pixelated;
 `;
 
 const GridCanvas = styled.canvas`

@@ -20,7 +20,7 @@ export const useDebugMode = () => {
 export interface DebugInfoProps {
   lensCenter: { x: number; y: number };
   mousePosition: { x: number; y: number };
-  cropCoordinates: { x: number; y: number; width: number; height: number };
+  cropCoordinates: { x: string; y: string; width: string; height: string };
   captureSize: number;
   scaleWidth: number;
   scaleHeight: number;
@@ -36,7 +36,7 @@ export interface DebugInfoProps {
 export const useDebugInfo = () => {
   const [debugInfo, setDebugInfo] = React.useState<DebugInfoProps>({
     lensCenter: { x: 0, y: 0 },
-    cropCoordinates: { x: 0, y: 0, width: 0, height: 0 },
+    cropCoordinates: { x: '0', y: '0', width: '0', height: '0' },
     captureSize: 0,
     scaleWidth: 0,
     scaleHeight: 0,

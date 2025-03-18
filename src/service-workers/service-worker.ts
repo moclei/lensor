@@ -9,20 +9,57 @@ console.log(
 );
 
 // Set up state with crann
-const { get, set, subscribe, findInstance, queryAgents } = create(
+const { get, set, subscribe, queryAgents, onInstanceReady } = create(
   LensorStateConfig,
   {
     debug: true
   }
 );
 
-subscribe((state, changes, agentInfo) => {
-  if (!agentInfo) {
-    console.warn('[SW] crann subscribe: No agent info found');
-    return;
+async function handleActionButtonClick(tab: chrome.tabs.Tab) {
+  console.log('Action clicked, tab: ', tab);
+  if (!tab.id) return;
+
+  const { key, state } = getAgentStateByTabId(tab.id);
+
+  if (key && state) {
+    console.log(
+      '[SW] handleActionButtonClick: Found existing agent and key for this tab: ',
+      { key, state }
+    );
+    // Toggle the active state of the agent
+    const { active: isActive } = get(key);
+    set({ active: !isActive }, key);
   }
-  if (!agentInfo.location.tabId) {
-    console.warn('[SW] crann subscribe: No tabId found');
+  if (!key || !state) {
+    console.warn('action button clicked but no agent found for that tab.', {
+      key,
+      state
+    });
+    onInstanceReady(async (key, info) => {
+      console.log('Crann instance ready: ', { key, info });
+
+      console.log('Getting media stream id for tab: ', { tabId: tab.id });
+      const mediaStreamId = await (chrome.tabCapture as any).getMediaStreamId({
+        consumerTabId: tab.id,
+        targetTabId: tab.id
+      });
+
+      if (key && info.location.tabId === tab.id) {
+        console.log(
+          'Crann instance ready was the one we wanted. Setting mediaStreamId'
+        );
+        set({ mediaStreamId, active: true }, key);
+      }
+    });
+
+    await injectContentScript(tab.id);
+  }
+}
+
+subscribe((state, changes, agentInfo) => {
+  if (!agentInfo || !agentInfo.location.tabId) {
+    console.warn('[SW] crann subscribe: Agent non-existent or no tabId');
     return;
   }
   if ('isSidepanelShown' in changes) {
@@ -45,28 +82,15 @@ subscribe((state, changes, agentInfo) => {
       });
     }
   }
-  const { active, initialized, mediaStreamId } = state;
-  console.log(
-    'active: ',
-    active,
-    ', initialized: ',
-    initialized,
-    ', mediaStreamId: ',
-    mediaStreamId
-  );
-  if (active && !mediaStreamId) {
-    console.log('Active but null media stream, create one.');
-    // Get a MediaStream for the active tab.
-    (chrome.tabCapture as any)
-      .getMediaStreamId({
-        consumerTabId: agentInfo.location.tabId,
-        targetTabId: agentInfo.location.tabId
-      })
-      .then((streamId: string) => {
-        set({ mediaStreamId: streamId }, agentInfo.id);
-      });
-  }
 });
+
+async function injectContentScript(tabId: number) {
+  console.log('Injecting content script into tab: ', tabId);
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['ui/index.js']
+  });
+}
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   //console.log("Tab updated ", tabId, changeInfo, tab);
@@ -125,61 +149,6 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   }
 });
 
-// const [active, setActive] = crann.subscribe('active');
-async function handleActionButtonClick(tab: chrome.tabs.Tab) {
-  console.log('Action clicked, tab: ', tab);
-  if (!tab.id) return;
-
-  const { key, state } = getAgentStateByTabId(tab.id);
-
-  if (!key || !state) {
-    console.warn('action button clicked but no agent found for that tab.', {
-      key,
-      state
-    });
-    chrome.scripting
-      .executeScript({
-        target: { tabId: tab.id },
-        files: ['ui/index.js']
-      })
-      .then(() => {
-        console.log('Injected ui script into tab: ', tab.id);
-        if (!tab.id) {
-          console.warn('action button clicked but no tab.id found');
-          return;
-        }
-        const { key, state } = getAgentStateByTabId(tab.id);
-        console.warn('Injected UI. Did we find an agent? ', {
-          key,
-          state
-        });
-        if (key && state) {
-          set({ active: true }, key);
-        }
-      });
-    return;
-  } else {
-    console.log('[SW] handleActionButtonClick: Found agent, key: ', key);
-    // Toggle the active state of the agent
-    console.log('[SW] handleActionButtonClick: setTimeout 2 setting active');
-    const { active } = get(key);
-    set({ active: !active }, key);
-  }
-}
-
-// Set up messaging with porter
-// const [post, setMessages, onConnect] = source();
-// onConnect(handlePorterConnect);
-// setMessages({
-//   hello_back: (message, agent) => {
-//     console.log('Received hello_back message: ', message, agent);
-//   },
-//   settings_clicked: (message, agent) => {
-//     console.log('Received settings_clicked message: ', message, agent);
-//     chrome.sidePanel.open({ tabId: agent?.location.tabId! });
-//   }
-// });
-// porter.onConnect.addListener(handlePorterConnect);
 chrome.runtime.onMessage.addListener(async (message) => {
   console.log('Message heard in service worker: ', message);
 });
@@ -225,17 +194,6 @@ chrome.runtime.onInstalled.addListener(
 );
 
 chrome.action.onClicked.addListener(handleActionButtonClick);
-
-// function handlePorterConnect(agentInfo: AgentInfo) {
-//   console.log('Porter connected, agentInfo: ', agentInfo);
-//   post(
-//     {
-//       action: `hello`,
-//       payload: { answer: `Hello ${agentInfo.location.context}!` }
-//     },
-//     agentInfo.id
-//   );
-// }
 
 function getAgentStateByTabId(tabId: number): {
   key: string | undefined;
