@@ -1,62 +1,93 @@
-import { useCallback, useRef, useEffect, MutableRefObject } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 
 interface UseDraggableOptions {
   handleRef: React.RefObject<HTMLElement>;
-  dragItemsRefs: React.RefObject<HTMLElement>[];
-  offset: number;
   updateCanvas: (coords: { x: number; y: number }) => void;
-  drawCanvas: () => string | null;
+  borderWidth?: number;
 }
 
 export function useDraggable({
   handleRef,
-  dragItemsRefs,
-  offset,
   updateCanvas,
-  drawCanvas
+  borderWidth = 0
 }: UseDraggableOptions) {
   const isDraggingRef = useRef(false);
   const lastPositionRef = useRef({ x: 0, y: 0 });
+  const currentPositionRef = useRef({ x: 0, y: 0 });
+
+  // Calculate boundary constraints
+  const calculateBoundaries = useCallback(() => {
+    const handle = handleRef.current;
+    if (!handle)
+      return {
+        minX: -Infinity,
+        maxX: Infinity,
+        minY: -Infinity,
+        maxY: Infinity
+      };
+
+    const handleRect = handle.getBoundingClientRect();
+    const halfWidth = handleRect.width / 2;
+    const halfHeight = handleRect.height / 2;
+
+    return {
+      minX: -halfWidth + borderWidth,
+      maxX: window.innerWidth - halfWidth - borderWidth,
+      minY: -halfHeight + borderWidth,
+      maxY: window.innerHeight - halfHeight - borderWidth
+    };
+  }, [handleRef, borderWidth]);
+
+  const constrainPosition = useCallback(
+    (newX: number, newY: number) => {
+      const boundaries = calculateBoundaries();
+
+      const constrainedX = Math.max(
+        boundaries.minX,
+        Math.min(newX, boundaries.maxX)
+      );
+
+      const constrainedY = Math.max(
+        boundaries.minY,
+        Math.min(newY, boundaries.maxY)
+      );
+
+      return {
+        x: constrainedX,
+        y: constrainedY
+      };
+    },
+    [calculateBoundaries]
+  );
 
   const updatePosition = useCallback(
     (deltaX: number, deltaY: number) => {
       const handle = handleRef.current;
       if (!handle) return;
 
-      const newLeft = handle.offsetLeft + deltaX;
-      const newTop = handle.offsetTop + deltaY;
+      const newX = currentPositionRef.current.x + deltaX;
+      const newY = currentPositionRef.current.y + deltaY;
 
-      handle.style.left = `${newLeft}px`;
-      handle.style.top = `${newTop}px`;
+      const { x, y } = constrainPosition(newX, newY);
+      currentPositionRef.current = { x, y };
 
-      dragItemsRefs.forEach((ref) => {
-        const elem = ref.current;
-        if (elem) {
-          elem.style.left = `${newLeft + parseInt(elem.dataset.offsetX || '0')}px`;
-          elem.style.top = `${newTop + parseInt(elem.dataset.offsetY || '0')}px`;
-        }
+      handle.style.left = `${x}px`;
+      handle.style.top = `${y}px`;
+
+      // Calculate the true center of the lens
+      const centerX = x + handle.offsetWidth / 2;
+      const centerY = y + handle.offsetHeight / 2;
+
+      // Account for scroll position
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
+
+      updateCanvas({
+        x: centerX + scrollX,
+        y: centerY + scrollY
       });
-
-      // Get the lens element (assuming it's one of the dragItemsRefs)
-      const lensElement = dragItemsRefs.find((ref) => ref.current)?.current;
-      if (lensElement) {
-        const rect = lensElement.getBoundingClientRect();
-
-        // Calculate the true center of the lens
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-
-        // Account for scroll position
-        const scrollX = window.scrollX;
-        const scrollY = window.scrollY;
-
-        updateCanvas({
-          x: centerX + scrollX,
-          y: centerY + scrollY
-        });
-      }
     },
-    [handleRef, dragItemsRefs, updateCanvas]
+    [handleRef, updateCanvas, constrainPosition]
   );
 
   const onMouseMove = useCallback(
@@ -103,20 +134,14 @@ export function useDraggable({
     };
   }, [handleRef, onMouseDown]);
 
+  // Initialize position from initialPosition prop
   useEffect(() => {
     const handle = handleRef.current;
     if (handle) {
-      dragItemsRefs.forEach((ref, index) => {
-        const elem = ref.current;
-        if (elem) {
-          elem.dataset.offsetX = (
-            elem.offsetLeft - handle.offsetLeft
-          ).toString();
-          elem.dataset.offsetY = (elem.offsetTop - handle.offsetTop).toString();
-        }
-      });
+      const rect = handle.getBoundingClientRect();
+      currentPositionRef.current = { x: rect.left, y: rect.top };
     }
-  }, [handleRef, dragItemsRefs]);
+  }, [handleRef]);
 
   // New function to simulate a drag operation
   const simulateDrag = useCallback(
@@ -126,5 +151,5 @@ export function useDraggable({
     [updatePosition]
   );
 
-  return { simulateDrag };
+  return { simulateDrag, lastPositionRef };
 }

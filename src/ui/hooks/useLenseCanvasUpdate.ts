@@ -1,8 +1,11 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import FisheyeGl, { Fisheye } from '../../lib/fisheyegl';
+import { DebugInfoProps } from '../utils/debug-utils';
+import { useLensorState } from './useLensorState';
 
 interface UseLenseCanvasUpdateProps {
   imageBitmap: ImageBitmap | null;
+  containerRef: React.RefObject<HTMLDivElement>;
   mainCanvasRef: React.RefObject<HTMLCanvasElement>;
   interCanvasRef: React.RefObject<HTMLCanvasElement>;
   fisheyeCanvasRef: React.RefObject<HTMLCanvasElement>;
@@ -13,6 +16,7 @@ interface UseLenseCanvasUpdateProps {
 
 export function useLenseCanvasUpdate({
   imageBitmap,
+  containerRef,
   mainCanvasRef,
   interCanvasRef,
   fisheyeCanvasRef,
@@ -24,13 +28,17 @@ export function useLenseCanvasUpdate({
   const distorterRef = useRef<Fisheye | null>(null);
   const CANVAS_SIZE = 400;
 
-  // Calculate effective zoom based on pixel scaling
-  useEffect(() => {
-    const zoomLevel = pixelScalingEnabled
-      ? zoom * window.devicePixelRatio
-      : zoom;
-    setEffectiveZoom(zoomLevel);
-  }, [zoom, pixelScalingEnabled]);
+  const { useStateItem } = useLensorState();
+  const [imageCropX, setImageCropX] = useStateItem('imageCropX');
+  const [imageCropY, setImageCropY] = useStateItem('imageCropY');
+
+  // // Calculate effective zoom based on pixel scaling
+  // useEffect(() => {
+  //   const zoomLevel = pixelScalingEnabled
+  //     ? zoom * window.devicePixelRatio
+  //     : zoom;
+  //   setEffectiveZoom(zoomLevel);
+  // }, [zoom, pixelScalingEnabled]);
 
   const updateSelectedPixel = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!ctx) return null;
@@ -39,96 +47,159 @@ export function useLenseCanvasUpdate({
     return `rgb(${pixel.data[0]}, ${pixel.data[1]}, ${pixel.data[2]})`;
   }, []);
 
-  const updateCanvas = useCallback(
-    (mousePos: { x: number; y: number }): string | null => {
-      if (!mainCanvasRef.current || !interCanvasRef.current || !imageBitmap) {
-        console.log('updateCanvas skipping because not initialized');
-        return null;
-      }
-
-      const mainCtx = mainCanvasRef.current.getContext('2d');
-      const interCtx = interCanvasRef.current.getContext('2d');
-
-      if (!mainCtx || !interCtx) return null;
-
-      mainCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-      interCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
-      const captureSize = CANVAS_SIZE / effectiveZoom;
-      const canvasRect = mainCanvasRef.current.getBoundingClientRect();
-
-      const lensCenter = {
-        x: canvasRect.left + canvasRect.width / 2,
-        y: canvasRect.top + canvasRect.height / 2
+  const calculateCropCoordinates = useCallback(() => {
+    if (!containerRef.current || !imageBitmap) {
+      console.log('calculateCropCoordinates skipping because not initialized');
+      return {
+        sourceX: 0,
+        sourceY: 0,
+        sourceW: 0,
+        sourceH: 0
       };
+    }
+    const canvasRect = containerRef.current.getBoundingClientRect();
 
-      const manualYOffset = 100;
-      const scale = imageBitmap.width / window.innerWidth;
+    const pixelRatio = window.devicePixelRatio;
 
-      const cropX = lensCenter.x * scale - captureSize / 2;
-      const cropY =
-        lensCenter.y * scale - captureSize / 2 + manualYOffset * scale;
+    const zoom = 1; // 1 = 100% zoom, 1.5 = 200% zoom, 2 = 300% zoom, 2.5 = 400% zoom
 
-      if (fisheyeOn) {
-        // Fisheye rendering logic
-        interCtx.drawImage(
-          imageBitmap,
-          cropX,
-          cropY,
-          captureSize,
-          captureSize,
-          0,
-          0,
-          CANVAS_SIZE,
-          CANVAS_SIZE
-        );
-        const fisheyeImageDataUrl = interCanvasRef.current.toDataURL();
+    const captureWidth = 400 / zoom;
+    const captureHeight = 400 / zoom;
 
-        if (!distorterRef.current) {
-          distorterRef.current = FisheyeGl({
-            canvas: fisheyeCanvasRef.current,
-            lens: {
-              a: 1,
-              b: 1,
-              Fx: -0.15,
-              Fy: -0.15,
-              scale: 1.05
-            },
-            fov: {
-              x: 1,
-              y: 1
-            }
-          });
-        }
+    const canvasTopLeftX = canvasRect.left;
+    const canvasTopLeftY = canvasRect.top;
+    const canvasWidth = canvasRect.width;
+    const canvasHeight = canvasRect.height;
+    const canvasCenterX = canvasTopLeftX + canvasWidth / 2;
+    const canvasCenterY = canvasTopLeftY + canvasHeight / 2;
 
-        distorterRef.current.setImage(fisheyeImageDataUrl);
-        mainCtx.drawImage(distorterRef.current.getCanvas(), 0, 0);
-      } else {
-        mainCtx.drawImage(
-          imageBitmap,
-          cropX,
-          cropY,
-          captureSize,
-          captureSize,
-          0,
-          0,
-          CANVAS_SIZE,
-          CANVAS_SIZE
-        );
+    const scaleWidth = imageBitmap.width / window.innerWidth;
+    const scaleHeight = imageBitmap.height / window.innerHeight;
+
+    const originOffsetX = -captureWidth / 2;
+    const originOffsetY = -captureHeight / 2;
+
+    // Scenario 1
+    // imageBitmap (source) is 1000px wide, 2000px tall
+    // webpage is 500px wide, 1000px tall
+    // canvas is 400px wide, 400px tall
+    // capture window (from imageBitmap) is 400px wide, 400px tall
+
+    // when canvas top left is -200, -200
+    // canvas center is 0, 0
+    // capture top left  is -200, -200, center is 0, 0
+
+    // when canvas top left is -190, -190 (+10x, +10y movement)
+    // canvas center is 10, 10
+    // capture top left is -200 + 10 * scaleWidth, -200 + 10 * scaleHeight
+
+    // when canvas top left is 100, 200 (+300x, +400y movement)
+    // canvas center is 300, 400
+    // capture top left is -200 + 300 * scaleWidth, -200 + 400 * scaleHeight
+
+    // Scenario 2
+    // imageBitmap (source) is 1000px wide, 2000px tall
+    // webpage is 500px wide, 1000px tall
+    // canvas is 400px wide, 400px tall
+    // capture window (from imageBitmap) is 300px wide, 300px tall
+
+    // when canvas top left is -190, -190 (+10x, +10y movement)
+    // canvas center is 10, 10
+    // capture top left is -150 + 10 * scaleWidth, -150 + 10 * scaleHeight
+
+    const dx = canvasCenterX;
+    const dy = canvasCenterY;
+
+    const captureTopLeftX = originOffsetX + dx * scaleWidth;
+    const captureTopLeftY = originOffsetY + dy * scaleHeight;
+
+    const sourceW = captureWidth;
+    const sourceH = captureHeight;
+
+    return {
+      sourceX: captureTopLeftX,
+      sourceY: captureTopLeftY,
+      sourceW,
+      sourceH
+    };
+  }, [imageBitmap, containerRef, imageCropX, imageCropY]);
+
+  const updateCanvas = useCallback((): string | null => {
+    if (!mainCanvasRef.current || !interCanvasRef.current || !imageBitmap) {
+      console.log('updateCanvas skipping because not initialized');
+      return null;
+    }
+
+    const mainCtx = mainCanvasRef.current.getContext('2d');
+    const interCtx = interCanvasRef.current.getContext('2d');
+
+    if (!mainCtx || !interCtx) return null;
+
+    mainCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    interCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    const { sourceX, sourceY, sourceW, sourceH } = calculateCropCoordinates();
+
+    if (fisheyeOn) {
+      // Fisheye rendering logic
+      interCtx.drawImage(
+        imageBitmap,
+        sourceX,
+        sourceY,
+        sourceW,
+        sourceH,
+        0,
+        0,
+        CANVAS_SIZE,
+        CANVAS_SIZE
+      );
+      const fisheyeImageDataUrl = interCanvasRef.current.toDataURL();
+
+      if (!distorterRef.current) {
+        distorterRef.current = FisheyeGl({
+          canvas: fisheyeCanvasRef.current,
+          lens: {
+            a: 1,
+            b: 1,
+            Fx: -0.15,
+            Fy: -0.15,
+            scale: 1.05
+          },
+          fov: {
+            x: 1,
+            y: 1
+          }
+        });
       }
 
-      return updateSelectedPixel(mainCtx);
-    },
-    [
-      mainCanvasRef,
-      interCanvasRef,
-      fisheyeCanvasRef,
-      imageBitmap,
-      effectiveZoom,
-      fisheyeOn,
-      updateSelectedPixel
-    ]
-  );
+      distorterRef.current.setImage(fisheyeImageDataUrl);
+      mainCtx.drawImage(distorterRef.current.getCanvas(), 0, 0);
+    } else {
+      mainCtx.drawImage(
+        imageBitmap,
+        sourceX,
+        sourceY,
+        sourceW,
+        sourceH,
+        0,
+        0,
+        CANVAS_SIZE,
+        CANVAS_SIZE
+      );
+    }
 
-  return { updateCanvas, effectiveZoom };
+    return updateSelectedPixel(mainCtx);
+  }, [
+    mainCanvasRef,
+    interCanvasRef,
+    fisheyeCanvasRef,
+    imageBitmap,
+    imageCropX,
+    imageCropY,
+    effectiveZoom,
+    fisheyeOn,
+    updateSelectedPixel
+  ]);
+
+  return { updateCanvas, effectiveZoom, calculateCropCoordinates };
 }

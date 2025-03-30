@@ -4,6 +4,7 @@ import Color from '../colors/Color';
 import { useLensorState } from '../../../ui/hooks/useLensorState';
 import Checkbox from '../../components/checkbox/Checkbox';
 import ZoomControl from '../zoom-control/ZoomControl';
+import { CropControls } from '../crop-controls/CropControls';
 
 const HomeContainer = styled.div`
   padding: 8px;
@@ -26,10 +27,10 @@ const Home: React.FC<HomeProps> = () => {
   const { useStateItem } = useLensorState();
   const [isGridShown, setIsGridShown] = useStateItem('showGrid');
   const [isFisheyeShown, setFisheyeShown] = useStateItem('showFisheye');
-  const [zoomLevel, setZoomLevel] = useStateItem('zoom');
   const [pixelScalingEnabled, setPixelScalingEnabled] = useStateItem(
     'pixelScalingEnabled'
   );
+
   const handleChange = (setting: string) => {
     console.log('handleChange, setting: ', setting);
     if (setting === 'grid') {
@@ -41,13 +42,6 @@ const Home: React.FC<HomeProps> = () => {
     }
   };
 
-  const handleZoomChange = (newZoom: number) => {
-    console.log('[SP] handleZoomChange, newZoom: ', newZoom);
-    setZoomLevel(newZoom);
-  };
-
-  console.log('Home, isGridShown: ', isGridShown);
-  console.log('Home, isFisheyeShown: ', isFisheyeShown);
   return (
     <HomeContainer>
       <SettingRow>
@@ -75,15 +69,10 @@ const Home: React.FC<HomeProps> = () => {
       </SettingRow>
 
       <SettingRow>
-        <ZoomControl
-          zoom={zoomLevel}
-          onZoomChange={handleZoomChange}
-          minZoom={0.5}
-          maxZoom={3}
-          step={0.1}
-        />
+        <ZoomControl minZoom={0.5} maxZoom={3} step={0.1} />
       </SettingRow>
       <Color />
+      <CropControls />
     </HomeContainer>
   );
 };

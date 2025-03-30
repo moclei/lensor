@@ -1,21 +1,11 @@
 import { useState, useCallback, useMemo } from 'react';
-
-// Utility functions for color manipulation
-export function parseRgbColor(
-  color: string
-): { r: number; g: number; b: number } | null {
-  const rgbMatch = color.match(/\d+/g);
-  if (!rgbMatch || rgbMatch.length !== 3) {
-    console.error('Invalid RGB color string:', color);
-    return null;
-  }
-
-  return {
-    r: parseInt(rgbMatch[0]),
-    g: parseInt(rgbMatch[1]),
-    b: parseInt(rgbMatch[2])
-  };
-}
+import {
+  generateMaterialPalette,
+  generatePalette,
+  hexToRgb,
+  parseRgbColor,
+  rgbToHex
+} from '../utils/color-utils';
 
 export function calculateLuminance(color: {
   r: number;
@@ -33,36 +23,24 @@ export function getContrastColor(color: string): string {
   return luminance > 0.5 ? '#000000' : '#ffffff';
 }
 
-export function rgbToHex(r: number, g: number, b: number): string {
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-}
-
-export function hexToRgb(
-  hex: string
-): { r: number; g: number; b: number } | null {
-  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-  hex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
-
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-      }
-    : null;
-}
-
 // Hook for managing color-related state and utilities
 export function useColorDetection(initialColor?: string) {
   const [hoveredColor, setHoveredColor] = useState<string>(
     initialColor || '#000000'
   );
+  const [colorPalette, setColorPalette] = useState<string[]>([]);
+  const [materialPalette, setMaterialPalette] = useState<
+    Record<number, string>
+  >({});
   const [contrastColor, setContrastColor] = useState<string>('#ffffff');
 
   const updateSelectedColor = useCallback((newColor: string) => {
     setHoveredColor(newColor);
     setContrastColor(getContrastColor(newColor));
+    const newPalette = generatePalette(newColor, 'monochromatic');
+    setColorPalette(newPalette);
+    const materialPalette = generateMaterialPalette(newColor);
+    setMaterialPalette(materialPalette);
   }, []);
 
   // Memoized color utilities
@@ -81,7 +59,9 @@ export function useColorDetection(initialColor?: string) {
     hoveredColor,
     contrastColor,
     updateSelectedColor,
-    colorUtils
+    colorUtils,
+    colorPalette,
+    materialPalette
   };
 }
 

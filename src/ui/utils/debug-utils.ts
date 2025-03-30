@@ -1,12 +1,5 @@
 import * as React from 'react';
 
-export interface DebugInfo {
-  lensCenter: { x: number; y: number };
-  captureSize: number;
-  cropCoords: { x: number; y: number; width: number; height: number };
-  scale: number;
-}
-
 export const useDebugMode = () => {
   const [debugMode, setDebugMode] = React.useState(false);
 
@@ -24,12 +17,34 @@ export const useDebugMode = () => {
   return { debugMode, setDebugMode };
 };
 
+export interface DebugInfoProps {
+  lensCenter: { x: number; y: number };
+  mousePosition: { x: number; y: number };
+  cropCoordinates: { x: string; y: string; width: string; height: string };
+  captureSize: number;
+  scaleWidth: number;
+  scaleHeight: number;
+  effectiveZoom: number;
+  imageBitmapInfo: {
+    width: number;
+    height: number;
+  };
+  windowRatio: string;
+  bitmapRatio: string;
+}
+
 export const useDebugInfo = () => {
-  const [debugInfo, setDebugInfo] = React.useState<DebugInfo>({
+  const [debugInfo, setDebugInfo] = React.useState<DebugInfoProps>({
     lensCenter: { x: 0, y: 0 },
+    cropCoordinates: { x: '0', y: '0', width: '0', height: '0' },
     captureSize: 0,
-    cropCoords: { x: 0, y: 0, width: 0, height: 0 },
-    scale: 0
+    scaleWidth: 0,
+    scaleHeight: 0,
+    effectiveZoom: 0,
+    imageBitmapInfo: { width: 0, height: 0 },
+    mousePosition: { x: 0, y: 0 },
+    windowRatio: '',
+    bitmapRatio: ''
   });
 
   return { debugInfo, setDebugInfo };
