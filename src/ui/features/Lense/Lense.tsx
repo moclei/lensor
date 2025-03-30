@@ -11,9 +11,9 @@ import {
   GearButton,
   GridCanvas,
   HiddenCanvas,
+  LenseContainer,
   MainCanvas,
-  PixelScalingIndicator,
-  RingHandle
+  PixelScalingIndicator
 } from './Lense.styles';
 import { useLenseCanvasUpdate } from '@/ui/hooks/useLenseCanvasUpdate';
 import { useGrid } from '@/ui/hooks/useGrid';
@@ -21,7 +21,11 @@ import { DebugOverlay } from './DebugOverlay';
 import { useDebugInfo, useDebugMode } from '@/ui/utils/debug-utils';
 import { useMediaCapture } from '@/ui/hooks/useMediaCapture';
 import { usePageObservers } from '@/ui/hooks/usePageObserver';
-
+import {
+  convertToGrayscalePreservingFormat,
+  hexToRgba
+} from '@/ui/utils/color-utils';
+import Handle from './Handle';
 const CANVAS_SIZE = 400;
 
 interface LenseProps {
@@ -31,6 +35,7 @@ interface LenseProps {
 }
 
 const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
   const fisheyeCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -39,6 +44,7 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
   const infoScrollRef = useRef<HTMLDivElement>(null);
 
   const [canvasesVisible, setCanvasesVisible] = useState(false);
+  // const [containerPosition, setContainerPosition] = useState({ x: 10, y: 10 });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
   const [canvasesReady, setCanvasesReady] = useState(false);
@@ -74,19 +80,24 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
         captureFrame();
       }
     },
-    { debounceTime: 300, threshold: 160 }
+    {
+      scrollOptions: { debounceTime: 500, threshold: 6 },
+      mutationOptions: { debounceTime: 500, threshold: 140 },
+      resizeOptions: { debounceTime: 500, threshold: 6 }
+    }
   );
 
-  const { updateCanvas, effectiveZoom } = useLenseCanvasUpdate({
-    imageBitmap: currentImage,
-    mainCanvasRef,
-    interCanvasRef,
-    fisheyeCanvasRef,
-    zoom,
-    pixelScalingEnabled,
-    fisheyeOn,
-    setDebugInfo
-  });
+  const { updateCanvas, effectiveZoom, calculateCropCoordinates } =
+    useLenseCanvasUpdate({
+      imageBitmap: currentImage,
+      containerRef,
+      mainCanvasRef,
+      interCanvasRef,
+      fisheyeCanvasRef,
+      zoom,
+      pixelScalingEnabled,
+      fisheyeOn
+    });
 
   const { drawGrid, drawCrosshairs } = useGrid({
     canvasRef: gridCanvasRef,
@@ -97,29 +108,26 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
     pixelScalingEnabled
   });
 
-  const { hoveredColor, contrastColor, updateSelectedColor } =
-    useColorDetection();
+  const { lastPositionRef } = useDraggable({
+    handleRef: containerRef,
+    updateCanvas: (coords: { x: number; y: number }) => {
+      setMousePos({ x: coords.x, y: coords.y });
+    },
+    borderWidth: 0
+  });
 
-  useEffect(() => {
-    console.log('Lense useEffect, currentImage: ', currentImage);
-  }, [currentImage]);
-
-  useEffect(() => {
-    console.log('Lense useEffect, active: ', active);
-  }, [active]);
+  const {
+    hoveredColor,
+    contrastColor,
+    updateSelectedColor,
+    colorPalette,
+    materialPalette
+  } = useColorDetection();
 
   useEffect(() => {
     if (active && currentImage && !initialDrawComplete) {
       console.log('Initialize lense graphics');
-      const canvasCenter = getCanvasCenter();
       setScale(currentImage.width / window.innerWidth);
-      setDebugInfo({
-        ...debugInfo,
-        mousePosition: { x: canvasCenter.x, y: canvasCenter.y },
-        scaleWidth: currentImage.width / window.innerWidth,
-        scaleHeight: currentImage.height / window.innerHeight
-      });
-      console.log('Initialize lense graphics');
       drawGrid();
       drawCrosshairs();
       showCanvases(true);
@@ -128,25 +136,6 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
       setInitialDrawComplete(true);
     }
   }, [active, currentImage, debugInfo, initialDrawComplete]);
-
-  const getCanvasCenter = useCallback((): { x: number; y: number } => {
-    const canvas = mainCanvasRef.current;
-    if (!canvas) {
-      console.error('getCanvasCenter, canvas not initialized');
-      return { x: 0, y: 0 };
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    setDebugInfo({
-      ...debugInfo,
-      lensCenter: { x: centerX, y: centerY }
-    });
-    console.log('getCanvasCenter, returning: ', { x: centerX, y: centerY });
-    return { x: centerX, y: centerY };
-  }, [debugInfo]);
 
   useEffect(() => {
     if (canvasesReady && currentImage && mainCanvasRef.current) {
@@ -166,16 +155,6 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
     updateSelectedColor
   ]);
 
-  useEffect(() => {
-    if (effectiveZoom !== debugInfo.effectiveZoom) {
-      console.log('useEffect, effectiveZoom', effectiveZoom);
-      setDebugInfo((prevState) => ({
-        ...prevState,
-        effectiveZoom
-      }));
-    }
-  }, [effectiveZoom, debugInfo, setDebugInfo]);
-
   const showCanvases = useCallback(
     (visible: boolean) => {
       setCanvasesVisible(visible);
@@ -192,23 +171,7 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
       !isSidepanelShown
     );
     setIsSidepanelShown(!isSidepanelShown);
-    // post({ action: 'settings_clicked', payload: {} });
   }, [isSidepanelShown, setIsSidepanelShown]);
-
-  const { simulateDrag } = useDraggable({
-    handleRef: ringHandleRef,
-    dragItemsRefs: [mainCanvasRef, gridCanvasRef, infoScrollRef],
-    offset: 8,
-    updateCanvas: (coords: { x: number; y: number }) => {
-      setMousePos({ x: coords.x, y: coords.y });
-      setDebugInfo({
-        ...debugInfo,
-        mousePosition: { x: coords.x, y: coords.y }
-      });
-    },
-    drawCanvas: () => updateCanvas(),
-    borderWidth: 0
-  });
 
   useEffect(() => {
     console.log('useEffect, drawGrid');
@@ -216,22 +179,29 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
   }, [gridOn, scale, effectiveZoom]);
 
   if (!active) return;
+  if (isCapturing) return;
 
   return (
-    <>
+    <LenseContainer
+      ref={containerRef}
+      initialPosition={lastPositionRef.current}
+    >
       <MainCanvas
         ref={mainCanvasRef}
         id="lensor-main-canvas"
         width={CANVAS_SIZE}
         height={CANVAS_SIZE}
         borderColor={hoveredColor}
-        style={{ display: canvasesVisible ? 'block' : 'none' }}
+        visible={canvasesVisible}
+        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
       />
       <GridCanvas
+        id="lensor-grid-canvas"
         ref={gridCanvasRef}
         width={CANVAS_SIZE}
         height={CANVAS_SIZE}
-        style={{ display: canvasesVisible ? 'block' : 'none' }}
+        visible={canvasesVisible}
+        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
       />
       <HiddenCanvas
         ref={fisheyeCanvasRef}
@@ -241,31 +211,55 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
       />
       <HiddenCanvas
         ref={interCanvasRef}
+        id="lensor-inter-canvas"
         width={CANVAS_SIZE}
         height={CANVAS_SIZE}
       />
-      <RingHandle
+      <Handle
         ref={ringHandleRef}
-        id="lensor-ring"
+        id="lensor-ring-handle"
         className="circle-ring"
-        backgroundColor={hoveredColor}
+        canvasSize={CANVAS_SIZE}
+        borderSize={60}
+        contrastColor={hexToRgba(
+          convertToGrayscalePreservingFormat(
+            materialPalette?.[800] || '#000000'
+          ),
+          1
+        )}
+        contrastColor2={colorPalette[1]}
+        hoveredColor={hoveredColor}
+        patternName="diagonal"
         style={{ display: canvasesVisible ? 'block' : 'none' }}
       >
         <ButtonSegment id="lensor-btn-segment">
           <GearButton onClick={handleGearClick}>
-            <FaGripVertical color={contrastColor} />
+            <FaGripVertical
+              size={'lg'}
+              color={materialPalette?.[50] || '#000000'}
+            />
           </GearButton>
         </ButtonSegment>
-      </RingHandle>
+      </Handle>
       {debugMode && (
-        <DebugOverlay imageBitmap={currentImage} debugInfo={debugInfo} />
+        <DebugOverlay
+          imageBitmap={currentImage}
+          mousePos={mousePos}
+          hoverColor={hoveredColor}
+          contrastColor={contrastColor}
+          colorPalette={colorPalette}
+          materialPalette={materialPalette}
+          effectiveZoom={effectiveZoom}
+          calculateCropCoordinates={calculateCropCoordinates}
+          containerRef={containerRef}
+        />
       )}
       {pixelScalingEnabled && (
         <PixelScalingIndicator>
           True Pixel Mode ({window.devicePixelRatio.toFixed(1)}x)
         </PixelScalingIndicator>
       )}
-    </>
+    </LenseContainer>
   );
 };
 

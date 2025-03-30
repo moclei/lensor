@@ -48,5 +48,9 @@ export const LensorStateConfig = {
   captureCount: {
     default: 0,
     partition: Partition.Service
+  },
+  lensePosition: {
+    default: { x: 0, y: 0 },
+    partition: Partition.Service
   }
 };

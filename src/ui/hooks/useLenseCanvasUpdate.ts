@@ -5,24 +5,24 @@ import { useLensorState } from './useLensorState';
 
 interface UseLenseCanvasUpdateProps {
   imageBitmap: ImageBitmap | null;
+  containerRef: React.RefObject<HTMLDivElement>;
   mainCanvasRef: React.RefObject<HTMLCanvasElement>;
   interCanvasRef: React.RefObject<HTMLCanvasElement>;
   fisheyeCanvasRef: React.RefObject<HTMLCanvasElement>;
   zoom: number;
   pixelScalingEnabled: boolean;
   fisheyeOn: boolean;
-  setDebugInfo: (value: React.SetStateAction<DebugInfoProps>) => void;
 }
 
 export function useLenseCanvasUpdate({
   imageBitmap,
+  containerRef,
   mainCanvasRef,
   interCanvasRef,
   fisheyeCanvasRef,
   zoom,
   pixelScalingEnabled,
-  fisheyeOn,
-  setDebugInfo
+  fisheyeOn
 }: UseLenseCanvasUpdateProps) {
   const [effectiveZoom, setEffectiveZoom] = useState(zoom);
   const distorterRef = useRef<Fisheye | null>(null);
@@ -48,7 +48,8 @@ export function useLenseCanvasUpdate({
   }, []);
 
   const calculateCropCoordinates = useCallback(() => {
-    if (!mainCanvasRef.current || !imageBitmap) {
+    if (!containerRef.current || !imageBitmap) {
+      console.log('calculateCropCoordinates skipping because not initialized');
       return {
         sourceX: 0,
         sourceY: 0,
@@ -56,26 +57,72 @@ export function useLenseCanvasUpdate({
         sourceH: 0
       };
     }
-    const canvasRect = mainCanvasRef.current.getBoundingClientRect();
+    const canvasRect = containerRef.current.getBoundingClientRect();
+
     const pixelRatio = window.devicePixelRatio;
+
+    const zoom = 1; // 1 = 100% zoom, 1.5 = 200% zoom, 2 = 300% zoom, 2.5 = 400% zoom
+
+    const captureWidth = 400 / zoom;
+    const captureHeight = 400 / zoom;
+
+    const canvasTopLeftX = canvasRect.left;
+    const canvasTopLeftY = canvasRect.top;
+    const canvasWidth = canvasRect.width;
+    const canvasHeight = canvasRect.height;
+    const canvasCenterX = canvasTopLeftX + canvasWidth / 2;
+    const canvasCenterY = canvasTopLeftY + canvasHeight / 2;
 
     const scaleWidth = imageBitmap.width / window.innerWidth;
     const scaleHeight = imageBitmap.height / window.innerHeight;
 
-    const sourceX = canvasRect.left * scaleWidth;
-    const sourceY = canvasRect.top * scaleHeight;
+    const originOffsetX = -captureWidth / 2;
+    const originOffsetY = -captureHeight / 2;
 
-    // const scaleMax = Math.max(scaleWidth, scaleHeight);
-    const sourceW = CANVAS_SIZE;
-    const sourceH = sourceW; //CANVAS_SIZE * scaleHeight;
+    // Scenario 1
+    // imageBitmap (source) is 1000px wide, 2000px tall
+    // webpage is 500px wide, 1000px tall
+    // canvas is 400px wide, 400px tall
+    // capture window (from imageBitmap) is 400px wide, 400px tall
+
+    // when canvas top left is -200, -200
+    // canvas center is 0, 0
+    // capture top left  is -200, -200, center is 0, 0
+
+    // when canvas top left is -190, -190 (+10x, +10y movement)
+    // canvas center is 10, 10
+    // capture top left is -200 + 10 * scaleWidth, -200 + 10 * scaleHeight
+
+    // when canvas top left is 100, 200 (+300x, +400y movement)
+    // canvas center is 300, 400
+    // capture top left is -200 + 300 * scaleWidth, -200 + 400 * scaleHeight
+
+    // Scenario 2
+    // imageBitmap (source) is 1000px wide, 2000px tall
+    // webpage is 500px wide, 1000px tall
+    // canvas is 400px wide, 400px tall
+    // capture window (from imageBitmap) is 300px wide, 300px tall
+
+    // when canvas top left is -190, -190 (+10x, +10y movement)
+    // canvas center is 10, 10
+    // capture top left is -150 + 10 * scaleWidth, -150 + 10 * scaleHeight
+
+    const dx = canvasCenterX;
+    const dy = canvasCenterY;
+
+    const captureTopLeftX = originOffsetX + dx * scaleWidth;
+    const captureTopLeftY = originOffsetY + dy * scaleHeight;
+
+    const sourceW = captureWidth;
+    const sourceH = captureHeight;
 
     return {
-      sourceX,
-      sourceY,
+      sourceX: captureTopLeftX,
+      sourceY: captureTopLeftY,
       sourceW,
       sourceH
     };
-  }, [imageBitmap, mainCanvasRef, imageCropX, imageCropY]);
+  }, [imageBitmap, containerRef, imageCropX, imageCropY]);
 
   const updateCanvas = useCallback((): string | null => {
     if (!mainCanvasRef.current || !interCanvasRef.current || !imageBitmap) {
@@ -97,8 +144,8 @@ export function useLenseCanvasUpdate({
       // Fisheye rendering logic
       interCtx.drawImage(
         imageBitmap,
-        sourceX + 308,
-        sourceY + 308,
+        sourceX,
+        sourceY,
         sourceW,
         sourceH,
         0,
@@ -130,8 +177,8 @@ export function useLenseCanvasUpdate({
     } else {
       mainCtx.drawImage(
         imageBitmap,
-        sourceX + 408,
-        sourceY + 408,
+        sourceX,
+        sourceY,
         sourceW,
         sourceH,
         0,
@@ -140,43 +187,6 @@ export function useLenseCanvasUpdate({
         CANVAS_SIZE
       );
     }
-
-    // Calculate window ratio
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
-    const windowRatio = (windowWidth / windowHeight).toFixed(2);
-
-    // Calculate bitmap ratio
-    const bitmapWidth = imageBitmap.width;
-    const bitmapHeight = imageBitmap.height;
-    const bitmapRatio = (bitmapWidth / bitmapHeight).toFixed(2);
-
-    // Log the ratios
-    const windowLog = `${windowWidth}:${windowHeight} (${windowRatio}:1)`;
-    const bitmapLog = `${bitmapWidth}:${bitmapHeight} (${bitmapRatio}:1)`;
-
-    setDebugInfo((prevState) => ({
-      ...prevState,
-      cropCoordinates: {
-        x: sourceX.toFixed(2),
-        y: sourceY.toFixed(2),
-        width: sourceW.toFixed(2),
-        height: sourceH.toFixed(2)
-      },
-      captureSize: CANVAS_SIZE / effectiveZoom,
-      scaleWidth: imageBitmap.width / window.innerWidth,
-      scaleHeight: imageBitmap.height / window.innerHeight,
-      lensCenter: {
-        x: sourceX + sourceW / 2,
-        y: sourceY + sourceH / 2
-      },
-      imageBitmapInfo: {
-        width: imageBitmap.width,
-        height: imageBitmap.height
-      },
-      windowRatio: windowLog,
-      bitmapRatio: bitmapLog
-    }));
 
     return updateSelectedPixel(mainCtx);
   }, [
@@ -188,9 +198,8 @@ export function useLenseCanvasUpdate({
     imageCropY,
     effectiveZoom,
     fisheyeOn,
-    updateSelectedPixel,
-    setDebugInfo
+    updateSelectedPixel
   ]);
 
-  return { updateCanvas, effectiveZoom };
+  return { updateCanvas, effectiveZoom, calculateCropCoordinates };
 }

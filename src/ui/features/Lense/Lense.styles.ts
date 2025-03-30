@@ -1,29 +1,96 @@
 import { styled } from 'styled-components';
 
-// New unified container
-const LenseContainer = styled.div`
+const LenseContainer = styled.div<{
+  initialPosition: { x: number; y: number };
+}>`
   position: fixed;
   z-index: 9999990;
-  right: 10px;
-  top: 10px;
-  width: 460px;
-  height: 460px;
+  left: ${(props) => props.initialPosition.x}px;
+  top: ${(props) => props.initialPosition.y}px;
+  width: 400px;
+  height: 400px;
   pointer-events: none;
 `;
 
-const MainCanvas = styled.canvas<{ borderColor: string }>`
-  position: fixed;
-  z-index: 9999998;
-  right: 10px;
-  top: 10px;
+const MainCanvas = styled.canvas<{
+  borderColor: string;
+  shadowColor: string;
+  visible: boolean;
+}>`
+  position: absolute;
+  z-index: 6;
   border-radius: 50%;
-  border: 8px solid ${(props) => props.borderColor};
   width: 400px;
   height: 400px;
   overflow: hidden;
-  opacity: 0.3;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+  opacity: 1;
+  box-shadow: inset 0 0 4px 6px ${(props) => props.shadowColor};
   image-rendering: pixelated;
+  display: ${(props) => (props.visible ? 'block' : 'none')};
+`;
+
+const GridCanvas = styled.canvas<{
+  shadowColor: string;
+  visible: boolean;
+}>`
+  position: absolute;
+  z-index: 10;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: ${(props) => props.shadowColor} 0px 0px 4px 6px inset;
+  display: ${(props) => (props.visible ? 'block' : 'none')};
+`;
+
+const HiddenCanvas = styled.canvas`
+  display: none;
+`;
+
+const ButtonSegment = styled.div`
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+  border: none;
+  overflow: visible;
+  cursor: pointer;
+  pointer-events: none;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+`;
+
+const GearButton = styled.button`
+  width: 50px;
+  height: 80px;
+  border-radius: 10%;
+  background-color: transparent;
+  padding-left: 23px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.3s ease;
+  clip-path: polygon(0 5px, 100% 0, 100% 80px, 0 75px);
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+  pointer-events: auto;
+`;
+
+const PixelScalingIndicator = styled.div`
+  position: fixed;
+  z-index: 9999999;
+  right: 10px;
+  top: 420px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
 `;
 
 const StyledDebugOverlay = styled.div<{
@@ -55,123 +122,14 @@ const StyledDebugInfo = styled.div`
   overflow: auto;
 `;
 
-const GridCanvas = styled.canvas`
-  position: fixed;
-  z-index: 9999999;
-  right: 18px;
-  top: 18px;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow: rgb(0, 0, 0) 0px 0px 16px inset;
-`;
-
-const HiddenCanvas = styled.canvas`
-  display: none;
-`;
-
-const RingHandle = styled.div<{ backgroundColor: string }>`
-  z-index: 9999997;
-  position: fixed;
-  right: -13px;
-  top: -10px;
-  width: 460px;
-  height: 460px;
-  border-radius: 50%;
-  cursor: grab;
-  overflow: hidden;
-  pointer-events: none;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 200px;
-    height: 200px;
-    border-radius: 50%;
-    background-color: transparent;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: ${(props) => props.backgroundColor};
-    opacity: 0.56;
-    border-radius: 50%;
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(7.7px);
-    -webkit-backdrop-filter: blur(7.7px);
-    border: 1px solid rgba(16, 1, 1, 0.8);
-    pointer-events: auto;
-  }
-`;
-
-const ButtonSegment = styled.div`
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background-color: transparent;
-  border: none;
-  overflow: visible;
-  cursor: pointer;
-  pointer-events: none;
-  z-index: 9999999;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-`;
-
-const GearButton = styled.button`
-  width: 30px;
-  height: 80px;
-  border-radius: 10%;
-  background-color: transparent;
-  padding-left: 10px;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  transition: background-color 0.3s ease;
-  clip-path: polygon(0 5px, 100% 0, 100% 80px, 0 75px);
-
-  &:hover {
-    background-color: rgba(255, 255, 255, 1);
-  }
-
-  svg {
-    width: 24px;
-    height: 24px;
-  }
-  pointer-events: auto;
-`;
-
-const PixelScalingIndicator = styled.div`
-  position: fixed;
-  z-index: 9999999;
-  right: 10px;
-  top: 420px;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  pointer-events: none;
-`;
-
 export {
   StyledDebugOverlay,
   StyledDebugInfo,
   MainCanvas,
   GridCanvas,
   HiddenCanvas,
-  RingHandle,
   ButtonSegment,
   GearButton,
-  PixelScalingIndicator
+  PixelScalingIndicator,
+  LenseContainer
 };

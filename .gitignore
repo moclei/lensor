@@ -3,3 +3,9 @@ node_modules/
 dist/
 .DS_Store
 src/assets/google-ads-full-payment-site.html
+
+# Scratch directory for experiments
+scratch/
+
+# AI assistant prompts
+.prompts/

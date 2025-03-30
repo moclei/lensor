@@ -1,6 +1,49 @@
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+
+// Simple debounce utility
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  const previousValueRef = useRef<T>(value);
+
+  useEffect(() => {
+    // Only debounce if the value actually changed
+    if (value !== previousValueRef.current) {
+      const handler = setTimeout(function () {
+        setDebouncedValue(value);
+      }, delay);
+
+      previousValueRef.current = value;
+      return () => {
+        clearTimeout(handler);
+      };
+    }
+    // Update ref for next comparison
+    previousValueRef.current = value;
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+interface ScrollOptions {
+  debounceTime?: number;
+  threshold?: number;
+}
+
+interface MutationOptions {
+  debounceTime?: number;
+  threshold?: number;
+}
+
+interface ResizeOptions {
+  debounceTime?: number;
+  threshold?: number;
+}
 
 interface UsePageObserversOptions {
+  scrollOptions?: ScrollOptions;
+  mutationOptions?: MutationOptions;
+  resizeOptions?: ResizeOptions;
+  // Keeping these for backward compatibility
   debounceTime?: number;
   threshold?: number;
 }
@@ -14,8 +57,27 @@ export function usePageObservers(
   onSignificantChange: () => void,
   options: UsePageObserversOptions = {}
 ): UsePageObserversResult {
-  const { debounceTime = 300, threshold = 10 } = options;
+  const defaultDebounceTime = 300;
+  const defaultThreshold = 10;
 
+  const {
+    scrollOptions = {},
+    mutationOptions = {},
+    resizeOptions = {},
+    debounceTime: globalDebounceTime = defaultDebounceTime,
+    threshold: globalThreshold = defaultThreshold
+  } = options;
+
+  // Set options with fallbacks
+  const scrollDebounceTime = scrollOptions.debounceTime ?? globalDebounceTime;
+  const scrollThreshold = scrollOptions.threshold ?? globalThreshold;
+  const mutationDebounceTime =
+    mutationOptions.debounceTime ?? globalDebounceTime;
+  const mutationThreshold = mutationOptions.threshold ?? globalThreshold;
+  const resizeDebounceTime = resizeOptions.debounceTime ?? globalDebounceTime;
+  const resizeThreshold = resizeOptions.threshold ?? globalThreshold;
+
+  // State for tracking changes
   const [lastChangeTimestamp, setLastChangeTimestamp] = useState<number | null>(
     null
   );
@@ -24,55 +86,134 @@ export function usePageObservers(
     y: number;
   } | null>(null);
 
-  const debounceTimerRef = useRef<number | null>(null);
+  // Track scores in state instead of refs - this allows the debounce to react to changes
+  const [scrollChangeScore, setScrollChangeScore] = useState(0);
+  const [mutationChangeScore, setMutationChangeScore] = useState(0);
+  const [resizeChangeScore, setResizeChangeScore] = useState(0);
+
+  // Use refs to track if we're currently processing a threshold event to prevent multiple calls
+  const isProcessingScrollRef = useRef(false);
+  const isProcessingMutationRef = useRef(false);
+  const isProcessingResizeRef = useRef(false);
+
+  // Previous scroll position for tracking changes
+  const prevScrollPosRef = useRef({ x: 0, y: 0 });
+
+  // Viewport size tracking
+  const [viewportSize, setViewportSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0
+  });
+
+  // Debounced scores
+  const debouncedScrollScore = useDebounce(
+    scrollChangeScore,
+    scrollDebounceTime
+  );
+  const debouncedMutationScore = useDebounce(
+    mutationChangeScore,
+    mutationDebounceTime
+  );
+  const debouncedResizeScore = useDebounce(
+    resizeChangeScore,
+    resizeDebounceTime
+  );
+
+  // MutationObserver ref
   const mutationObserverRef = useRef<MutationObserver | null>(null);
 
-  // Track DOM change score
-  const changeScoreRef = useRef(0);
+  // Handle scroll changes
+  const handleScroll = useCallback(() => {
+    const scrollPos = {
+      x: window.scrollX,
+      y: window.scrollY
+    };
 
-  // Debounced handler
-  const debouncedHandler = useCallback(() => {
-    if (changeScoreRef.current > threshold) {
-      console.log(
-        'usePageObservers, debouncedHandler, changeScoreRef.current: ',
-        changeScoreRef.current
-      );
-      setLastChangeTimestamp(Date.now());
-      onSignificantChange();
-    }
-    changeScoreRef.current = 0;
-  }, [onSignificantChange, threshold]);
+    // Calculate how much the user has scrolled
+    const deltaX = Math.abs(scrollPos.x - prevScrollPosRef.current.x);
+    const deltaY = Math.abs(scrollPos.y - prevScrollPosRef.current.y);
 
-  // DOM change observer
-  useEffect(() => {
-    // Mutation observer callback
-    const handleDOMMutation = (mutations: MutationRecord[]) => {
-      // Weight different types of mutations
+    // Update the previous position
+    prevScrollPosRef.current = scrollPos;
+
+    // Update last scroll position state
+    setLastScrollPosition(scrollPos);
+
+    // Increase the score based on scroll distance
+    setScrollChangeScore((prev) => prev + deltaY * 0.1 + deltaX * 0.05);
+
+    console.log(
+      'Scroll event detected, new score:',
+      scrollChangeScore + deltaY * 0.1 + deltaX * 0.05
+    );
+  }, [scrollChangeScore]);
+
+  // Handle DOM mutations
+  const handleDOMMutation = useCallback(
+    (mutations: MutationRecord[]) => {
+      let scoreIncrement = 0;
+
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList') {
-          changeScoreRef.current += mutation.addedNodes.length * 2;
-          changeScoreRef.current += mutation.removedNodes.length;
+          scoreIncrement += mutation.addedNodes.length * 2;
+          scoreIncrement += mutation.removedNodes.length;
         } else if (mutation.type === 'attributes') {
-          changeScoreRef.current += 0.5;
+          scoreIncrement += 0.5;
         }
       });
 
-      // Clear any existing timer
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current);
-      }
+      setMutationChangeScore((prev) => prev + scoreIncrement);
       console.log(
-        'usePageObservers, handleDOMMutation, changeScoreRef.current: ',
-        changeScoreRef.current
+        'Mutation detected, new score:',
+        mutationChangeScore + scoreIncrement
       );
-      // Set new timer
-      debounceTimerRef.current = window.setTimeout(
-        debouncedHandler,
-        debounceTime
-      );
-    };
+    },
+    [mutationChangeScore]
+  );
 
-    // Create and attach mutation observer
+  // Handle resize events
+  const handleResize = useCallback(() => {
+    const currentWidth = window.innerWidth;
+    const currentHeight = window.innerHeight;
+
+    // Calculate the change
+    const widthChange = Math.abs(currentWidth - viewportSize.width);
+    const heightChange = Math.abs(currentHeight - viewportSize.height);
+
+    // Update viewport size
+    setViewportSize({
+      width: currentWidth,
+      height: currentHeight
+    });
+
+    // Update score based on size changes
+    const scoreIncrement = widthChange * 0.1 + heightChange * 0.2;
+    setResizeChangeScore((prev) => prev + scoreIncrement);
+
+    console.log(
+      'Resize detected, new score:',
+      resizeChangeScore + scoreIncrement
+    );
+  }, [viewportSize, resizeChangeScore]);
+
+  // Set up scroll listener
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [handleScroll]);
+
+  // Set up resize listener
+  useEffect(() => {
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [handleResize]);
+
+  // Set up mutation observer
+  useEffect(() => {
     mutationObserverRef.current = new MutationObserver(handleDOMMutation);
     mutationObserverRef.current.observe(document.body, {
       childList: true,
@@ -85,55 +226,81 @@ export function usePageObservers(
       if (mutationObserverRef.current) {
         mutationObserverRef.current.disconnect();
       }
-
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current);
-      }
     };
-  }, [debouncedHandler, debounceTime]);
+  }, [handleDOMMutation]);
 
-  // Scroll observer
+  // Process debounced scroll changes
   useEffect(() => {
-    // Scroll handler
-    const handleScroll = () => {
-      const scrollPosition = {
-        x: window.scrollX,
-        y: window.scrollY
-      };
+    if (
+      debouncedScrollScore > scrollThreshold &&
+      !isProcessingScrollRef.current
+    ) {
+      console.log('SCROLL THRESHOLD EXCEEDED:', debouncedScrollScore);
+      // Set processing flag to prevent multiple calls
+      isProcessingScrollRef.current = true;
 
-      setLastScrollPosition(scrollPosition);
+      // First update the timestamp
+      setLastChangeTimestamp(Date.now());
+      // Then trigger the callback
+      onSignificantChange();
+      // Reset the score with a small delay to ensure effects run in proper sequence
+      setTimeout(() => {
+        setScrollChangeScore(0);
+        // Reset processing flag after score has been reset
+        setTimeout(() => {
+          isProcessingScrollRef.current = false;
+        }, 50);
+      }, 0);
+    }
+  }, [debouncedScrollScore, scrollThreshold, onSignificantChange]);
 
-      // Clear any existing timer
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current);
-      }
+  // Process debounced mutation changes
+  useEffect(() => {
+    if (
+      debouncedMutationScore > mutationThreshold &&
+      !isProcessingMutationRef.current
+    ) {
+      console.log('MUTATION THRESHOLD EXCEEDED:', debouncedMutationScore);
+      // Set processing flag to prevent multiple calls
+      isProcessingMutationRef.current = true;
 
-      // Add to change score
-      changeScoreRef.current += 5;
+      setLastChangeTimestamp(Date.now());
+      onSignificantChange();
 
-      console.log(
-        'usePageObservers, handleScroll, changeScoreRef.current: ',
-        changeScoreRef.current
-      );
+      // Reset the score with a small delay to ensure effects run in proper sequence
+      setTimeout(() => {
+        setMutationChangeScore(0);
+        // Reset processing flag after score has been reset
+        setTimeout(() => {
+          isProcessingMutationRef.current = false;
+        }, 50);
+      }, 0);
+    }
+  }, [debouncedMutationScore, mutationThreshold, onSignificantChange]);
 
-      // Set new timer
-      debounceTimerRef.current = window.setTimeout(
-        debouncedHandler,
-        debounceTime
-      );
-    };
+  // Process debounced resize changes
+  useEffect(() => {
+    if (
+      debouncedResizeScore > resizeThreshold &&
+      !isProcessingResizeRef.current
+    ) {
+      console.log('RESIZE THRESHOLD EXCEEDED:', debouncedResizeScore);
+      // Set processing flag to prevent multiple calls
+      isProcessingResizeRef.current = true;
 
-    // Attach scroll listener
-    window.addEventListener('scroll', handleScroll, { passive: true });
+      setLastChangeTimestamp(Date.now());
+      onSignificantChange();
 
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [debouncedHandler, debounceTime]);
+      // Reset the score with a small delay to ensure effects run in proper sequence
+      setTimeout(() => {
+        setResizeChangeScore(0);
+        // Reset processing flag after score has been reset
+        setTimeout(() => {
+          isProcessingResizeRef.current = false;
+        }, 50);
+      }, 0);
+    }
+  }, [debouncedResizeScore, resizeThreshold, onSignificantChange]);
 
   return {
     lastChangeTimestamp,
