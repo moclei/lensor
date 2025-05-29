@@ -53,6 +53,7 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
   const { useStateItem } = useLensorState();
   const [isSidepanelShown, setIsSidepanelShown] =
     useStateItem('isSidepanelShown');
+  const [lensePosition, setLensePosition] = useStateItem('lensePosition');
 
   const [gridOn] = useStateItem('showGrid');
   const [fisheyeOn] = useStateItem('showFisheye');
@@ -108,11 +109,14 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
     pixelScalingEnabled
   });
 
-  const { lastPositionRef } = useDraggable({
-    handleRef: containerRef,
+  useDraggable({
+    movableElementRef: containerRef,
+    dragHandleRef: ringHandleRef,
     updateCanvas: (coords: { x: number; y: number }) => {
       setMousePos({ x: coords.x, y: coords.y });
     },
+    initialPosition: lensePosition,
+    onDragEnd: setLensePosition,
     borderWidth: 0
   });
 
@@ -182,10 +186,7 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
   if (isCapturing) return;
 
   return (
-    <LenseContainer
-      ref={containerRef}
-      initialPosition={lastPositionRef.current}
-    >
+    <LenseContainer ref={containerRef} initialPosition={lensePosition}>
       <MainCanvas
         ref={mainCanvasRef}
         id="lensor-main-canvas"
