@@ -37,8 +37,6 @@ async function handleActionButtonClick(tab: chrome.tabs.Tab) {
       state
     });
     onInstanceReady(async (key, info) => {
-      console.log('Crann instance ready: ', { key, info });
-
       console.log('Getting media stream id for tab: ', { tabId: tab.id });
       const mediaStreamId = await (chrome.tabCapture as any).getMediaStreamId({
         consumerTabId: tab.id,
