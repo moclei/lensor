@@ -58,12 +58,10 @@ const state: LensorState = {
   imageBitmap: null
 };
 
-const [useCrann, get, set, subscribe, getAgentInfo, onReady] = connect(
-  LensorStateConfig,
-  {
-    debug: true
-  }
-);
+const crann = connect(LensorStateConfig, {
+  debug: true
+});
+const { useCrann, get, set, subscribe, getAgentInfo, onReady } = crann;
 const [_active, _setActive, onActive] = useCrann('active');
 const [initialized, setInitialized, onInitialize] = useCrann('initialized');
 const [_mediaStreamId, _setMediaStreamId, onMediaStreamChange] =
