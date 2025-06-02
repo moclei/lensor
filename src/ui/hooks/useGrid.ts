@@ -30,13 +30,19 @@ export function useGrid({
   const drawGrid = useCallback(
     (options: GridDrawingOptions = {}) => {
       const canvas = canvasRef.current;
-      if (!canvas || !isGridVisible) return;
+      if (!canvas) return;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
       // Clear previous grid
+      console.log('[useGrid] Clearing previous grid');
       ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+      if (!isGridVisible) {
+        setIsGridDrawn(false);
+        return;
+      }
 
       // Use provided or default styling
       ctx.strokeStyle = options.color || gridColor;
