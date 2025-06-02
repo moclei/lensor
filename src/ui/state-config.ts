@@ -1,4 +1,5 @@
 import { Partition } from 'crann';
+import { BrowserLocation } from 'porter-source';
 
 export const LensorStateConfig = {
   active: {
@@ -52,5 +53,26 @@ export const LensorStateConfig = {
   lensePosition: {
     default: { x: 0, y: 0 },
     partition: Partition.Service
+  },
+  getMediaStreamId: {
+    handler: async (
+      state: any,
+      setState: (newState: Partial<any>) => Promise<void>,
+      target: BrowserLocation
+    ) => {
+      console.log('Getting media stream id for target: ', { target });
+      const mediaStreamId = await (chrome.tabCapture as any).getMediaStreamId({
+        consumerTabId: target.tabId,
+        targetTabId: target.tabId
+      });
+
+      console.log(
+        'Crann instance ready was the one we wanted. Setting mediaStreamId'
+      );
+      return mediaStreamId;
+    },
+    validate: (amount: number) => {
+      if (amount < 0) throw new Error('Amount must be positive');
+    }
   }
 };
