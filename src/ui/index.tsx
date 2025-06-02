@@ -5,8 +5,6 @@ import './index.css';
 import Lense from './features/Lense/Lense';
 import { connect } from 'crann';
 import { LensorStateConfig } from './state-config';
-import { ConnectionStatus } from 'crann/dist/types/model/crann.model';
-import { observeDOMChanges, observeScrollChange } from '@/scripts/observable';
 
 console.log('Injected Lensor UI mounted');
 const styles = {
@@ -29,15 +27,7 @@ const styles = {
   }
 };
 
-type BorderCropProps = {
-  possibleLetterboxing: boolean;
-  possiblePillarboxing: boolean;
-  estimatedTopBottomBorderHeight: number;
-  estimatedLeftRightBorderWidth: number;
-};
-
 type LensorState = {
-  mediaStreamId: string | null;
   active: boolean;
   shadowContainer: HTMLDivElement;
   shadowRoot: ShadowRoot | null;
@@ -48,7 +38,6 @@ type LensorState = {
 };
 
 const state: LensorState = {
-  mediaStreamId: null,
   active: false,
   shadowContainer: document.createElement('div'),
   shadowRoot: null,
@@ -61,23 +50,25 @@ const state: LensorState = {
 const crann = connect(LensorStateConfig, {
   debug: true
 });
-const { useCrann, get, set, subscribe, getAgentInfo, onReady } = crann;
+const { useCrann, onReady } = crann;
 const [_active, _setActive, onActive] = useCrann('active');
-const [initialized, setInitialized, onInitialize] = useCrann('initialized');
-const [_mediaStreamId, _setMediaStreamId, onMediaStreamChange] =
-  useCrann('mediaStreamId');
+const [initialized, setInitialized] = useCrann('initialized');
 
-onMediaStreamChange((update) => {
-  console.log('handleMediaStreamChange, mediaStreamId: ', update);
-  if (update.current && update.current !== update.previous) {
-    state.mediaStreamId = update.current;
+onReady(() => {
+  console.log('[UI] onReady()');
+  if (!initialized) {
     initializeReact();
+    setInitialized(true);
   }
 });
 
 onActive((update) => {
-  console.log('handleInitializeChange, initialized: ', initialized);
+  console.log('onActive, active: ', { update });
   if (self === top && state.shadowRoot && update.current !== update.previous) {
+    console.log('onActive, toggling shadow root visibility: ', { update });
+    // if (!initialized) {
+    //   initializeReact();
+    // }
     toggleShadowRootVisibility(update.current);
   }
 });
@@ -125,15 +116,10 @@ function initializeReact() {
     const root = createRoot(uiRoot);
     root.render(
       <StyleSheetManager target={styleSlot}>
-        <Lense
-          mediaStreamId={state.mediaStreamId}
-          onStop={handleLensorStop}
-          onClose={handleLensorClose}
-        />
+        <Lense onStop={handleLensorStop} onClose={handleLensorClose} />
       </StyleSheetManager>
     );
   }
-  setInitialized(true);
 }
 
 function handleLensorStop() {
@@ -143,18 +129,6 @@ function handleLensorStop() {
 function handleLensorClose() {
   console.log('Handle lensor close');
 }
-
-// function handlePopoverVisibility(show: boolean) {
-//   console.log('Handle popover visibility');
-//   if (state.shadowRoot) {
-//     let newStyles: Partial<CSSStyleDeclaration> = styles.container.shadow;
-//     if (!show) {
-//       newStyles = { ...newStyles, ...styles.container.invisible };
-//     }
-//     setStylesOnElement(state.shadowContainer, newStyles);
-//     return;
-//   }
-// }
 
 function setStylesOnElement(
   element: HTMLElement,

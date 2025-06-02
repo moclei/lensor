@@ -30,12 +30,11 @@ import Handle from './Handle';
 const CANVAS_SIZE = 400;
 
 interface LenseProps {
-  mediaStreamId: string | null;
   onStop: () => void;
   onClose: () => void;
 }
 
-const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
+const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,6 +56,8 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
   const [active] = useStateItem('active');
   const [pixelScalingEnabled] = useStateItem('pixelScalingEnabled');
 
+  console.log('[Lense] active state:', active);
+
   const { debugMode } = useDebugMode();
   const { debugInfo, setDebugInfo } = useDebugInfo();
 
@@ -65,7 +66,13 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
     isCapturing,
     captureFrame,
     error
-  } = useMediaCapture(mediaStreamId, active);
+  } = useMediaCapture();
+
+  console.log('[Lense] Media capture state:', {
+    hasImage: !!currentImage,
+    isCapturing,
+    hasError: !!error
+  });
 
   const {
     canvasesVisible,
@@ -81,21 +88,30 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
     mainCanvasRef,
     active,
     onInitialize: () => {
-      console.log('Lense canvas initialization callback');
+      console.log('[Lense] Canvas initialization callback executed');
       if (gridOn) drawGrid();
       drawCrosshairs();
     },
     onDrawComplete: (canvasCenter) => {
-      console.log('Lense canvas draw complete callback', canvasCenter);
-      // Additional logic after initialization is complete
+      console.log(
+        '[Lense] Canvas draw complete callback, center:',
+        canvasCenter
+      );
     }
+  });
+
+  console.log('[Lense] Canvas lifecycle state:', {
+    canvasesVisible,
+    initialized,
+    canvasesReady,
+    initialDrawComplete
   });
 
   const { lastChangeTimestamp, lastScrollPosition } = usePageObservers(
     () => {
-      if (active && mediaStreamId && !isCapturing) {
+      if (active && !isCapturing) {
         console.log(
-          'usePageObservers, significant change, calling captureFrame'
+          '[Lense] Page observer detected change, calling captureFrame'
         );
         captureFrame();
       }
@@ -148,9 +164,17 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
   } = useColorDetection();
 
   useEffect(() => {
+    console.log('[Lense] Canvas update effect triggered:', {
+      canvasesReady,
+      hasCurrentImage: !!currentImage,
+      hasMainCanvas: !!mainCanvasRef.current
+    });
+
     if (canvasesReady && currentImage && mainCanvasRef.current) {
-      console.log('Updating canvas with detected color');
+      console.log('[Lense] Updating canvas and detecting color');
       const updatedColor = updateCanvas();
+      console.log('[Lense] updateCanvas result:', updatedColor);
+
       const detectedColor = detectPixelColor(mainCanvasRef);
       if (updatedColor) {
         updateSelectedColor(updatedColor);
@@ -175,9 +199,19 @@ const Lense: React.FC<LenseProps> = ({ mediaStreamId, onStop, onClose }) => {
   }, [isSidepanelShown, setIsSidepanelShown]);
 
   useEffect(() => {
-    console.log('useEffect, drawGrid');
+    console.log('[Lense] Grid effect triggered');
     drawGrid();
   }, [gridOn, scale, effectiveZoom]);
+
+  // Explicit force update when component is re-enabled
+  // useEffect(() => {
+  //   if (active && currentImage && canvasesReady) {
+  //     console.log(
+  //       '[Lense] Active state changed to true, forcing canvas update'
+  //     );
+  //     updateCanvas();
+  //   }
+  // }, [active, currentImage, canvasesReady, updateCanvas]);
 
   if (!active) return;
   if (isCapturing) return;

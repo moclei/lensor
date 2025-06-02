@@ -17,7 +17,7 @@ const { get, set, subscribe, queryAgents, onInstanceReady } = create(
 );
 
 async function handleActionButtonClick(tab: chrome.tabs.Tab) {
-  console.log('Action clicked, tab: ', tab);
+  console.log('Action button clicked on tab: ', tab);
   if (!tab.id) return;
 
   const { key, state } = getAgentStateByTabId(tab.id);
@@ -27,8 +27,12 @@ async function handleActionButtonClick(tab: chrome.tabs.Tab) {
       '[SW] handleActionButtonClick: Found existing agent and key for this tab: ',
       { key, state }
     );
-    // Toggle the active state of the agent
+
     const { active: isActive } = get(key);
+    console.log(
+      '[SW] handleActionButtonClick: changing isActive to: ',
+      !isActive
+    );
     set({ active: !isActive }, key);
   }
   if (!key || !state) {
@@ -36,21 +40,6 @@ async function handleActionButtonClick(tab: chrome.tabs.Tab) {
       key,
       state
     });
-    onInstanceReady(async (key, info) => {
-      console.log('Getting media stream id for tab: ', { tabId: tab.id });
-      const mediaStreamId = await (chrome.tabCapture as any).getMediaStreamId({
-        consumerTabId: tab.id,
-        targetTabId: tab.id
-      });
-
-      if (key && info.location.tabId === tab.id) {
-        console.log(
-          'Crann instance ready was the one we wanted. Setting mediaStreamId'
-        );
-        set({ mediaStreamId, active: true }, key);
-      }
-    });
-
     await injectContentScript(tab.id);
   }
 }
@@ -78,6 +67,34 @@ subscribe((state, changes, agentInfo) => {
         tabId: agentInfo.location.tabId,
         enabled: false
       });
+    }
+  }
+  if ('initialized' in changes) {
+    console.log(
+      '[SW] crann subscribe: initialized changed',
+      changes.initialized
+    );
+    if (changes.initialized === true) {
+      console.log('[SW] crann subscribe: activating UI');
+      const { key, state } = getAgentStateByTabId(agentInfo.location.tabId);
+      if (!key) {
+        console.warn(
+          '[SW] crann subscribe: no key found for tabId',
+          agentInfo.location.tabId
+        );
+        return;
+      }
+      console.log(
+        '[SW] handleActionButtonClick: Found existing agent and key for this tab: ',
+        { key, state }
+      );
+
+      const { active: isActive } = get(key);
+      console.log(
+        '[SW] handleActionButtonClick: changing isActive to: ',
+        !isActive
+      );
+      set({ active: !isActive }, key);
     }
   }
 });
