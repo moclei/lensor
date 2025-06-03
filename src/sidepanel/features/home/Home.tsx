@@ -69,7 +69,7 @@ const Home: React.FC<HomeProps> = () => {
       </SettingRow>
 
       <SettingRow>
-        <ZoomControl minZoom={0.5} maxZoom={3} step={0.1} />
+        <ZoomControl minZoom={0.5} maxZoom={16} step={1} />
       </SettingRow>
       <Color />
       <CropControls />

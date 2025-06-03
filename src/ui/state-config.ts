@@ -31,7 +31,7 @@ export const LensorStateConfig = {
     partition: Partition.Service
   },
   zoom: {
-    default: 1,
+    default: 3,
     partition: Partition.Service
   },
   pixelScalingEnabled: {

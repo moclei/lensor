@@ -123,22 +123,20 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     }
   );
 
-  const { updateCanvas, effectiveZoom, calculateCropCoordinates } =
-    useLenseCanvasUpdate({
-      imageBitmap: currentImage,
-      containerRef,
-      mainCanvasRef,
-      interCanvasRef,
-      fisheyeCanvasRef,
-      zoom,
-      pixelScalingEnabled,
-      fisheyeOn
-    });
+  const { updateCanvas, calculateCropCoordinates } = useLenseCanvasUpdate({
+    imageBitmap: currentImage,
+    containerRef,
+    mainCanvasRef,
+    interCanvasRef,
+    fisheyeCanvasRef,
+    zoom,
+    pixelScalingEnabled,
+    fisheyeOn
+  });
 
   const { drawGrid, drawCrosshairs } = useGrid({
     canvasRef: gridCanvasRef,
     isGridVisible: gridOn,
-    gridSpacing: scale * effectiveZoom,
     canvasSize: CANVAS_SIZE,
     zoom,
     pixelScalingEnabled
@@ -187,7 +185,8 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     currentImage,
     mousePos,
     updateCanvas,
-    updateSelectedColor
+    updateSelectedColor,
+    zoom
   ]);
 
   const handleGearClick = useCallback(() => {
@@ -201,17 +200,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   useEffect(() => {
     console.log('[Lense] Grid effect triggered');
     drawGrid();
-  }, [gridOn, scale, effectiveZoom]);
-
-  // Explicit force update when component is re-enabled
-  // useEffect(() => {
-  //   if (active && currentImage && canvasesReady) {
-  //     console.log(
-  //       '[Lense] Active state changed to true, forcing canvas update'
-  //     );
-  //     updateCanvas();
-  //   }
-  // }, [active, currentImage, canvasesReady, updateCanvas]);
+  }, [gridOn, scale, zoom]);
 
   if (!active) return;
   if (isCapturing) return;
@@ -281,7 +270,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
           contrastColor={contrastColor}
           colorPalette={colorPalette}
           materialPalette={materialPalette}
-          effectiveZoom={effectiveZoom}
           calculateCropCoordinates={calculateCropCoordinates}
           containerRef={containerRef}
         />
