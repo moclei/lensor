@@ -36,7 +36,6 @@ export const DebugOverlay: React.FC<{
   contrastColor: string;
   colorPalette: string[];
   materialPalette: Record<number, string>;
-  effectiveZoom: number;
   containerRef: React.RefObject<HTMLDivElement>;
   calculateCropCoordinates: () => {
     sourceX: number;
@@ -47,7 +46,6 @@ export const DebugOverlay: React.FC<{
 }> = ({
   imageBitmap,
   mousePos,
-  effectiveZoom,
   containerRef,
   calculateCropCoordinates,
   hoverColor,
@@ -151,7 +149,6 @@ export const DebugOverlay: React.FC<{
         <div>
           Height Scale Factor: {imageBitmap.height / window.innerHeight}
         </div>
-        <div>Effective Zoom: {effectiveZoom}</div>
         <div>
           Container Offset: left: {containerRef.current?.offsetLeft.toFixed(2)},
           top: {containerRef.current?.offsetTop.toFixed(2)}

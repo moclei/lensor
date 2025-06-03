@@ -5,7 +5,6 @@ interface UseGridDrawingProps {
   isGridVisible: boolean;
   zoom: number;
   pixelScalingEnabled: boolean;
-  gridSpacing: number;
   canvasSize?: number;
   gridColor?: string;
   gridLineWidth?: number;
@@ -19,7 +18,7 @@ interface GridDrawingOptions {
 export function useGrid({
   canvasRef,
   isGridVisible,
-  gridSpacing,
+  zoom,
   canvasSize = 400,
   gridColor = '#000000',
   gridLineWidth = 0.5
@@ -44,6 +43,10 @@ export function useGrid({
         return;
       }
 
+      const cssPixelsToShow = canvasSize / zoom;
+      const cssPixelSizeOnCanvas = canvasSize / cssPixelsToShow;
+      const gridSpacing = cssPixelSizeOnCanvas;
+
       // Use provided or default styling
       ctx.strokeStyle = options.color || gridColor;
       ctx.lineWidth = options.lineWidth || gridLineWidth;
@@ -65,14 +68,7 @@ export function useGrid({
       ctx.stroke();
       setIsGridDrawn(true);
     },
-    [
-      canvasRef,
-      isGridVisible,
-      gridSpacing,
-      canvasSize,
-      gridColor,
-      gridLineWidth
-    ]
+    [canvasRef, isGridVisible, canvasSize, gridColor, gridLineWidth, zoom]
   );
 
   // Draw crosshairs in the center of the canvas
@@ -117,7 +113,7 @@ export function useGrid({
     if (isGridVisible) {
       drawGrid();
     }
-  }, [isGridVisible, gridSpacing, drawGrid]);
+  }, [isGridVisible, drawGrid]);
 
   return {
     drawGrid,

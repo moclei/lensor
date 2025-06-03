@@ -31,21 +31,12 @@ export function useLenseCanvasUpdate({
     fisheyeOn
   });
 
-  const [effectiveZoom, setEffectiveZoom] = useState(zoom);
   const distorterRef = useRef<Fisheye | null>(null);
   const CANVAS_SIZE = 400;
 
   const { useStateItem } = useLensorState();
   const [imageCropX, setImageCropX] = useStateItem('imageCropX');
   const [imageCropY, setImageCropY] = useStateItem('imageCropY');
-
-  // // Calculate effective zoom based on pixel scaling
-  // useEffect(() => {
-  //   const zoomLevel = pixelScalingEnabled
-  //     ? zoom * window.devicePixelRatio
-  //     : zoom;
-  //   setEffectiveZoom(zoomLevel);
-  // }, [zoom, pixelScalingEnabled]);
 
   const updateSelectedPixel = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!ctx) return null;
@@ -70,10 +61,8 @@ export function useLenseCanvasUpdate({
 
     const pixelRatio = window.devicePixelRatio;
 
-    const zoom = 1; // 1 = 100% zoom, 1.5 = 200% zoom, 2 = 300% zoom, 2.5 = 400% zoom
-
-    const captureWidth = 400 / zoom;
-    const captureHeight = 400 / zoom;
+    // const captureWidth = 400 / zoom;
+    // const captureHeight = 400 / zoom;
 
     const canvasTopLeftX = canvasRect.left;
     const canvasTopLeftY = canvasRect.top;
@@ -85,36 +74,15 @@ export function useLenseCanvasUpdate({
     const scaleWidth = imageBitmap.width / window.innerWidth;
     const scaleHeight = imageBitmap.height / window.innerHeight;
 
+    const userZoomLevel = zoom;
+    const cssPixelsToShow = CANVAS_SIZE / userZoomLevel; // 400/4 = 100 CSS pixels
+    const capturedPixelsToShow = cssPixelsToShow * scaleWidth; // 100 * 2 = 200 captured pixels
+
+    const captureWidth = capturedPixelsToShow;
+    const captureHeight = capturedPixelsToShow;
+
     const originOffsetX = -captureWidth / 2;
     const originOffsetY = -captureHeight / 2;
-
-    // Scenario 1
-    // imageBitmap (source) is 1000px wide, 2000px tall
-    // webpage is 500px wide, 1000px tall
-    // canvas is 400px wide, 400px tall
-    // capture window (from imageBitmap) is 400px wide, 400px tall
-
-    // when canvas top left is -200, -200
-    // canvas center is 0, 0
-    // capture top left  is -200, -200, center is 0, 0
-
-    // when canvas top left is -190, -190 (+10x, +10y movement)
-    // canvas center is 10, 10
-    // capture top left is -200 + 10 * scaleWidth, -200 + 10 * scaleHeight
-
-    // when canvas top left is 100, 200 (+300x, +400y movement)
-    // canvas center is 300, 400
-    // capture top left is -200 + 300 * scaleWidth, -200 + 400 * scaleHeight
-
-    // Scenario 2
-    // imageBitmap (source) is 1000px wide, 2000px tall
-    // webpage is 500px wide, 1000px tall
-    // canvas is 400px wide, 400px tall
-    // capture window (from imageBitmap) is 300px wide, 300px tall
-
-    // when canvas top left is -190, -190 (+10x, +10y movement)
-    // canvas center is 10, 10
-    // capture top left is -150 + 10 * scaleWidth, -150 + 10 * scaleHeight
 
     const dx = canvasCenterX;
     const dy = canvasCenterY;
@@ -125,6 +93,18 @@ export function useLenseCanvasUpdate({
     const sourceW = captureWidth;
     const sourceH = captureHeight;
 
+    console.log('[Zoom Analysis]', {
+      userZoomLevel,
+      cssPixelsToShow,
+      capturedPixelsToShow,
+      viewportSize: { width: window.innerWidth, height: window.innerHeight },
+      imageBitmapSize: { width: imageBitmap.width, height: imageBitmap.height },
+      scaleFactors: { scaleWidth, scaleHeight },
+      devicePixelRatio: window.devicePixelRatio,
+      cropSize: { captureWidth, captureHeight },
+      implicitZoom: scaleWidth // This is your actual zoom factor!
+    });
+
     const result = {
       sourceX: captureTopLeftX,
       sourceY: captureTopLeftY,
@@ -134,7 +114,7 @@ export function useLenseCanvasUpdate({
 
     console.log('[useLenseCanvasUpdate] Calculated crop coordinates:', result);
     return result;
-  }, [imageBitmap, containerRef, imageCropX, imageCropY]);
+  }, [imageBitmap, containerRef, imageCropX, imageCropY, zoom]);
 
   const updateCanvas = useCallback((): string | null => {
     console.log('[useLenseCanvasUpdate] updateCanvas called with state:', {
@@ -230,11 +210,13 @@ export function useLenseCanvasUpdate({
     imageBitmap,
     imageCropX,
     imageCropY,
-    effectiveZoom,
     fisheyeOn,
     updateSelectedPixel,
     calculateCropCoordinates
   ]);
 
-  return { updateCanvas, effectiveZoom, calculateCropCoordinates };
+  return {
+    updateCanvas,
+    calculateCropCoordinates
+  };
 }
