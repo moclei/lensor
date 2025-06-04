@@ -24,14 +24,11 @@ export function getContrastColor(color: string): string {
 }
 
 // Hook for managing color-related state and utilities
-export function useColorDetection(initialColor?: string) {
-  const [hoveredColor, setHoveredColor] = useState<string>(
-    initialColor || '#000000'
-  );
-  const [colorPalette, setColorPalette] = useState<string[]>([]);
-  const [materialPalette, setMaterialPalette] = useState<
-    Record<number, string>
-  >({});
+export function useColorDetection(
+  setColorPalette: (colorPalette: string[]) => void,
+  setMaterialPalette: (materialPalette: Record<number, string>) => void
+) {
+  const [hoveredColor, setHoveredColor] = useState<string>('#000000');
   const [contrastColor, setContrastColor] = useState<string>('#ffffff');
 
   const updateSelectedColor = useCallback((newColor: string) => {
@@ -59,9 +56,7 @@ export function useColorDetection(initialColor?: string) {
     hoveredColor,
     contrastColor,
     updateSelectedColor,
-    colorUtils,
-    colorPalette,
-    materialPalette
+    colorUtils
   };
 }
 

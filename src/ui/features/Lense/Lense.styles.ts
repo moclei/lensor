@@ -80,19 +80,6 @@ const GearButton = styled.button`
   pointer-events: auto;
 `;
 
-const PixelScalingIndicator = styled.div`
-  position: fixed;
-  z-index: 9999999;
-  right: 10px;
-  top: 420px;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  pointer-events: none;
-`;
-
 const StyledDebugOverlay = styled.div<{
   lenseCenter: { x: number; y: number };
 }>`
@@ -130,6 +117,5 @@ export {
   HiddenCanvas,
   ButtonSegment,
   GearButton,
-  PixelScalingIndicator,
   LenseContainer
 };

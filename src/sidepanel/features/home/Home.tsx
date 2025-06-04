@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import styled from 'styled-components';
 import Color from '../colors/Color';
 import { useLensorState } from '../../../ui/hooks/useLensorState';
@@ -27,9 +27,8 @@ const Home: React.FC<HomeProps> = () => {
   const { useStateItem } = useLensorState();
   const [isGridShown, setIsGridShown] = useStateItem('showGrid');
   const [isFisheyeShown, setFisheyeShown] = useStateItem('showFisheye');
-  const [pixelScalingEnabled, setPixelScalingEnabled] = useStateItem(
-    'pixelScalingEnabled'
-  );
+  const [colorPalette] = useStateItem('colorPalette');
+  const [materialPalette] = useStateItem('materialPalette');
 
   const handleChange = (setting: string) => {
     console.log('handleChange, setting: ', setting);
@@ -37,10 +36,13 @@ const Home: React.FC<HomeProps> = () => {
       setIsGridShown(!isGridShown);
     } else if (setting === 'fisheye') {
       setFisheyeShown(!isFisheyeShown);
-    } else if (setting === 'pixelScaling') {
-      setPixelScalingEnabled(!pixelScalingEnabled);
     }
   };
+
+  useEffect(() => {
+    console.log('colorPalette: ', colorPalette);
+    console.log('materialPalette: ', materialPalette);
+  }, [colorPalette, materialPalette]);
 
   return (
     <HomeContainer>
@@ -61,18 +63,9 @@ const Home: React.FC<HomeProps> = () => {
       </SettingRow>
 
       <SettingRow>
-        <Checkbox
-          label="True pixel scaling"
-          checked={pixelScalingEnabled}
-          onChange={() => handleChange('pixelScaling')}
-        />
-      </SettingRow>
-
-      <SettingRow>
         <ZoomControl minZoom={0.5} maxZoom={16} step={1} />
       </SettingRow>
       <Color />
-      <CropControls />
     </HomeContainer>
   );
 };

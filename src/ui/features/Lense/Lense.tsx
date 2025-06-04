@@ -12,8 +12,7 @@ import {
   GridCanvas,
   HiddenCanvas,
   LenseContainer,
-  MainCanvas,
-  PixelScalingIndicator
+  MainCanvas
 } from './Lense.styles';
 import { useLenseCanvasUpdate } from '@/ui/hooks/useLenseCanvasUpdate';
 import { useGrid } from '@/ui/hooks/useGrid';
@@ -50,11 +49,13 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     useStateItem('isSidepanelShown');
   const [lensePosition, setLensePosition] = useStateItem('lensePosition');
 
+  const [colorPalette, setColorPalette] = useStateItem('colorPalette');
+  const [materialPalette, setMaterialPalette] = useStateItem('materialPalette');
+
   const [gridOn] = useStateItem('showGrid');
   const [fisheyeOn] = useStateItem('showFisheye');
   const [zoom] = useStateItem('zoom');
   const [active] = useStateItem('active');
-  const [pixelScalingEnabled] = useStateItem('pixelScalingEnabled');
 
   console.log('[Lense] active state:', active);
 
@@ -130,7 +131,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     interCanvasRef,
     fisheyeCanvasRef,
     zoom,
-    pixelScalingEnabled,
     fisheyeOn
   });
 
@@ -138,8 +138,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     canvasRef: gridCanvasRef,
     isGridVisible: gridOn,
     canvasSize: CANVAS_SIZE,
-    zoom,
-    pixelScalingEnabled
+    zoom
   });
 
   useDraggable({
@@ -153,13 +152,8 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     borderWidth: 0
   });
 
-  const {
-    hoveredColor,
-    contrastColor,
-    updateSelectedColor,
-    colorPalette,
-    materialPalette
-  } = useColorDetection();
+  const { hoveredColor, contrastColor, updateSelectedColor } =
+    useColorDetection(setColorPalette, setMaterialPalette);
 
   useEffect(() => {
     console.log('[Lense] Canvas update effect triggered:', {
@@ -273,11 +267,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
           calculateCropCoordinates={calculateCropCoordinates}
           containerRef={containerRef}
         />
-      )}
-      {pixelScalingEnabled && (
-        <PixelScalingIndicator>
-          True Pixel Mode ({window.devicePixelRatio.toFixed(1)}x)
-        </PixelScalingIndicator>
       )}
     </LenseContainer>
   );

@@ -22,6 +22,14 @@ export const LensorStateConfig = {
     default: 'rgb(87, 102, 111)',
     partition: Partition.Service
   },
+  materialPalette: {
+    default: {} as Record<number, string>,
+    partition: Partition.Service
+  },
+  colorPalette: {
+    default: [] as string[],
+    partition: Partition.Service
+  },
   showGrid: {
     default: false,
     partition: Partition.Service
@@ -32,18 +40,6 @@ export const LensorStateConfig = {
   },
   zoom: {
     default: 3,
-    partition: Partition.Service
-  },
-  pixelScalingEnabled: {
-    default: false,
-    partition: Partition.Service
-  },
-  imageCropX: {
-    default: 0,
-    partition: Partition.Service
-  },
-  imageCropY: {
-    default: 0,
     partition: Partition.Service
   },
   captureCount: {
