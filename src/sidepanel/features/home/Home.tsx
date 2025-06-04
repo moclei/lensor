@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import styled from 'styled-components';
 import Color from '../colors/Color';
+import ColorPaletteDisplay from '../color-palette/ColorPaletteDisplay';
 import { useLensorState } from '../../../ui/hooks/useLensorState';
 import Checkbox from '../../components/checkbox/Checkbox';
 import ZoomControl from '../zoom-control/ZoomControl';
@@ -27,8 +28,7 @@ const Home: React.FC<HomeProps> = () => {
   const { useStateItem } = useLensorState();
   const [isGridShown, setIsGridShown] = useStateItem('showGrid');
   const [isFisheyeShown, setFisheyeShown] = useStateItem('showFisheye');
-  const [colorPalette] = useStateItem('colorPalette');
-  const [materialPalette] = useStateItem('materialPalette');
+  const [hoveredColor] = useStateItem('hoveredColor');
 
   const handleChange = (setting: string) => {
     console.log('handleChange, setting: ', setting);
@@ -38,11 +38,6 @@ const Home: React.FC<HomeProps> = () => {
       setFisheyeShown(!isFisheyeShown);
     }
   };
-
-  useEffect(() => {
-    console.log('colorPalette: ', colorPalette);
-    console.log('materialPalette: ', materialPalette);
-  }, [colorPalette, materialPalette]);
 
   return (
     <HomeContainer>
@@ -65,7 +60,9 @@ const Home: React.FC<HomeProps> = () => {
       <SettingRow>
         <ZoomControl minZoom={0.5} maxZoom={16} step={1} />
       </SettingRow>
-      <Color />
+
+      <Color hoveredColor={hoveredColor} />
+      <ColorPaletteDisplay />
     </HomeContainer>
   );
 };

@@ -24,15 +24,11 @@ const ColorLabel = styled.input`
   padding: 0;
 `;
 
-interface ColorProps {}
+interface ColorProps {
+  hoveredColor: string;
+}
 
-const Color: React.FC<ColorProps> = () => {
-  const { useStateItem } = useLensorState();
-  const [hoveredColor, setHoveredColor] = useStateItem('hoveredColor');
-
-  useEffect(() => {
-    console.log('Color, hoveredColor: ', hoveredColor);
-  }, [hoveredColor]);
+const Color: React.FC<ColorProps> = ({ hoveredColor }) => {
   return (
     <ColorContainer>
       <ColorBox color={hoveredColor} />
