@@ -51,6 +51,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
 
   const [colorPalette, setColorPalette] = useStateItem('colorPalette');
   const [materialPalette, setMaterialPalette] = useStateItem('materialPalette');
+  const [hoveredColor, setHoveredColor] = useStateItem('hoveredColor');
 
   const [gridOn] = useStateItem('showGrid');
   const [fisheyeOn] = useStateItem('showFisheye');
@@ -152,8 +153,11 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     borderWidth: 0
   });
 
-  const { hoveredColor, contrastColor, updateSelectedColor } =
-    useColorDetection(setColorPalette, setMaterialPalette);
+  const { contrastColor, updateSelectedColor } = useColorDetection(
+    setColorPalette,
+    setMaterialPalette,
+    setHoveredColor
+  );
 
   useEffect(() => {
     console.log('[Lense] Canvas update effect triggered:', {
