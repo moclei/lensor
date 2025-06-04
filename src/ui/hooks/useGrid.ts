@@ -4,7 +4,6 @@ interface UseGridDrawingProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   isGridVisible: boolean;
   zoom: number;
-  pixelScalingEnabled: boolean;
   canvasSize?: number;
   gridColor?: string;
   gridLineWidth?: number;

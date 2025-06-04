@@ -10,7 +10,6 @@ interface UseLenseCanvasUpdateProps {
   interCanvasRef: React.RefObject<HTMLCanvasElement>;
   fisheyeCanvasRef: React.RefObject<HTMLCanvasElement>;
   zoom: number;
-  pixelScalingEnabled: boolean;
   fisheyeOn: boolean;
 }
 
@@ -21,22 +20,16 @@ export function useLenseCanvasUpdate({
   interCanvasRef,
   fisheyeCanvasRef,
   zoom,
-  pixelScalingEnabled,
   fisheyeOn
 }: UseLenseCanvasUpdateProps) {
   console.log('[useLenseCanvasUpdate] Hook called with:', {
     hasImage: !!imageBitmap,
     zoom,
-    pixelScalingEnabled,
     fisheyeOn
   });
 
   const distorterRef = useRef<Fisheye | null>(null);
   const CANVAS_SIZE = 400;
-
-  const { useStateItem } = useLensorState();
-  const [imageCropX, setImageCropX] = useStateItem('imageCropX');
-  const [imageCropY, setImageCropY] = useStateItem('imageCropY');
 
   const updateSelectedPixel = useCallback((ctx: CanvasRenderingContext2D) => {
     if (!ctx) return null;
@@ -58,11 +51,6 @@ export function useLenseCanvasUpdate({
       };
     }
     const canvasRect = containerRef.current.getBoundingClientRect();
-
-    const pixelRatio = window.devicePixelRatio;
-
-    // const captureWidth = 400 / zoom;
-    // const captureHeight = 400 / zoom;
 
     const canvasTopLeftX = canvasRect.left;
     const canvasTopLeftY = canvasRect.top;
@@ -114,7 +102,7 @@ export function useLenseCanvasUpdate({
 
     console.log('[useLenseCanvasUpdate] Calculated crop coordinates:', result);
     return result;
-  }, [imageBitmap, containerRef, imageCropX, imageCropY, zoom]);
+  }, [imageBitmap, containerRef, zoom]);
 
   const updateCanvas = useCallback((): string | null => {
     console.log('[useLenseCanvasUpdate] updateCanvas called with state:', {
@@ -208,8 +196,6 @@ export function useLenseCanvasUpdate({
     interCanvasRef,
     fisheyeCanvasRef,
     imageBitmap,
-    imageCropX,
-    imageCropY,
     fisheyeOn,
     updateSelectedPixel,
     calculateCropCoordinates

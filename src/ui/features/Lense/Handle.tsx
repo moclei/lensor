@@ -120,38 +120,3 @@ export const Handle = forwardRef<HTMLDivElement, RingHandleProps>(
 );
 
 export default Handle;
-
-// Usage example in your Lense component
-// This part shows how to update your Lense component to use the new RingHandle
-/*
-import RingHandle from './RingHandle';
-import { ButtonSegment, GearButton } from './RingHandle.styles';
-
-// In your Lense component's render:
-<RingHandle
-  ref={ringHandleRef}
-  id="lensor-ring-handle"
-  className="circle-ring"
-  canvasSize={CANVAS_SIZE}
-  borderSize={60}
-  contrastColor={hexToRgba(
-    convertToGrayscalePreservingFormat(
-      materialPalette?.[800] || '#000000'
-    ),
-    1
-  )}
-  contrastColor2={colorPalette[1]}
-  hoveredColor={hoveredColor}
-  patternName="diamonds" // You can dynamically change this
-  style={{ display: canvasesVisible ? 'block' : 'none' }}
->
-  <ButtonSegment id="lensor-btn-segment">
-    <GearButton onClick={handleGearClick}>
-      <FaGripVertical
-        size={'lg'}
-        color={materialPalette?.[900] || '#000000'}
-      />
-    </GearButton>
-  </ButtonSegment>
-</RingHandle>
-*/
