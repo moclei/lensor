@@ -1,0 +1,227 @@
+# Lensor Project Manifest
+# Structured metadata for AI assistant context
+
+project:
+  name: Lensor
+  type: chrome-extension
+  manifest_version: 3
+  description: Draggable, zoomable lens overlay for pixel inspection and color detection
+  repository: https://github.com/moclei/lensor
+  author: Marc O'Cleirigh
+  license: MIT
+  status: pre-release
+  goal: MVP release to Chrome Web Store
+
+context_docs:
+  project: .context/PROJECT.md
+  manifest: .context/manifest.yaml
+  ideas: .context/IDEAS.md
+
+tech_stack:
+  language: TypeScript
+  runtime: Browser (Chrome Extension)
+  ui_framework: React 18
+  styling: styled-components
+  state_management: crann
+  build_tool: esbuild
+  graphics:
+    - Canvas 2D API
+    - WebGL (fisheye effect)
+
+extension:
+  permissions:
+    - tabCapture
+    - tabs
+    - storage
+    - scripting
+    - sidePanel
+    - contextMenus
+    - favicon
+  host_permissions:
+    - '*://*/*'
+
+architecture:
+  contexts:
+    service_worker:
+      description: Background script handling Chrome APIs and state orchestration
+      entry: src/service-workers/service-worker.ts
+      responsibilities:
+        - Chrome extension API interactions
+        - Crann state hub (create)
+        - Tab capture stream ID generation
+        - Sidepanel visibility management
+        - Action button click handling
+
+    ui:
+      description: React app injected into pages via Shadow DOM
+      entry: src/ui/index.tsx
+      responsibilities:
+        - Render draggable lens component
+        - Canvas-based zoom rendering
+        - Color detection at lens center
+        - Drag handling
+        - Page change observation
+      mount_strategy: Closed Shadow DOM attached to body
+
+    sidepanel:
+      description: Chrome sidepanel with extension controls
+      entry: src/sidepanel/index.tsx
+      html: src/sidepanel/sidepanel.html
+      responsibilities:
+        - Display current detected color
+        - Show generated color palettes
+        - Toggle grid overlay
+        - Toggle fisheye effect
+        - Adjust zoom level
+
+  state_sync:
+    library: crann
+    pattern: Service Worker as hub, content scripts as agents
+    partition_types:
+      Instance: Per-tab state (active, mediaStreamId, isSidepanelShown)
+      Service: Global shared state (zoom, hoveredColor, colorPalette, materialPalette)
+
+files:
+  entry_points:
+    service_worker: src/service-workers/service-worker.ts
+    ui: src/ui/index.tsx
+    sidepanel: src/sidepanel/index.tsx
+    content_script: src/scripts/content-script.ts
+
+  state_config: src/ui/state-config.ts
+
+  main_components:
+    lense: src/ui/features/Lense/Lense.tsx
+    lense_styles: src/ui/features/Lense/Lense.styles.ts
+    handle: src/ui/features/Lense/Handle.tsx
+    sidepanel_home: src/sidepanel/features/home/Home.tsx
+    color_palette_display: src/sidepanel/features/color-palette/ColorPaletteDisplay.tsx
+
+  hooks:
+    useMediaCapture: src/ui/hooks/useMediaCapture.ts
+    useDraggable: src/ui/hooks/useDraggable.ts
+    useCanvasLifecycle: src/ui/hooks/useCanvasLifecycle.ts
+    useLenseCanvasUpdate: src/ui/hooks/useLenseCanvasUpdate.ts
+    useColorDetection: src/ui/hooks/useColorDetection.ts
+    useGrid: src/ui/hooks/useGrid.ts
+    usePageObserver: src/ui/hooks/usePageObserver.ts
+    useLensorState: src/ui/hooks/useLensorState.ts
+
+  utilities:
+    color_utils: src/ui/utils/color-utils.tsx
+    coordinate_utils: src/ui/utils/coordinate-utils.ts
+    grid_utils: src/ui/utils/grid-utils.ts
+    debug_utils: src/ui/utils/debug-utils.ts
+
+  lib:
+    fisheyegl: src/lib/fisheyegl.ts
+    shaders: src/lib/shaders/
+
+  build:
+    script: build.mjs
+    config: tsconfig.json
+
+  assets:
+    icons: src/assets/images/
+    styles: src/assets/styles/
+
+  output: dist/
+
+dependencies:
+  runtime:
+    crann:
+      version: '^1.0.41'
+      purpose: Cross-context state synchronization
+      note: Custom library by project author
+    react:
+      version: '^18.2.0'
+      purpose: UI framework
+    react-dom:
+      version: '^18.2.0'
+      purpose: React DOM renderer
+    styled-components:
+      version: '^6.1.12'
+      purpose: CSS-in-JS styling
+    react-icons:
+      version: '^5.3.0'
+      purpose: Icon components
+
+  build:
+    esbuild:
+      version: '^0.19.9'
+      purpose: Bundler
+    chokidar:
+      version: '^3.5.3'
+      purpose: File watching
+    typescript:
+      version: '^5.3.3'
+      purpose: Type checking
+
+  indirect:
+    porter-source:
+      version: '^1.1.15'
+      purpose: Used internally by crann for messaging
+      note: Not used directly in this project
+
+features:
+  core:
+    - name: Draggable Lens
+      status: functional
+      description: Circular magnifying lens with drag handle
+
+    - name: Zoom Control
+      status: functional
+      description: Adjustable magnification (0.5x to 16x)
+      control_location: sidepanel
+
+    - name: Color Detection
+      status: functional
+      description: Detects RGB color at lens center pixel
+
+    - name: Color Palettes
+      status: in_progress
+      branch: feat/color-palettes
+      description: Generates monochromatic and Material Design palettes from detected color
+
+    - name: Auto-Recapture
+      status: functional
+      description: Re-captures page on scroll, resize, or DOM mutations
+
+  visual:
+    - name: Grid Overlay
+      status: functional
+      description: Pixel grid overlay on magnified area
+
+    - name: Fisheye Effect
+      status: functional
+      description: WebGL-based fisheye distortion (aesthetic)
+      implementation: src/lib/fisheyegl.ts
+
+    - name: Adaptive Theming
+      status: functional
+      description: Lens UI colors adapt to detected color
+
+scripts:
+  build: 'NODE_ENV=production node ./build.mjs'
+  build_dev: 'NODE_ENV=development node ./build.mjs'
+  watch: 'NODE_ENV=development node ./build.mjs --watch'
+  type_check: 'tsc --noEmit'
+  lint: "eslint 'src/**/*.{js,ts,tsx}'"
+  clean: 'rm -rf dist'
+
+ignored:
+  directories:
+    - scratch/ # Experimental scripts
+    - src/devtools/ # Abandoned devtools panel
+    - .prompts/ # Legacy AI documentation
+  notes:
+    - 'dist/ is build output, regenerated on each build'
+    - 'node_modules/ is standard npm dependency folder'
+
+development:
+  load_extension: 'Load dist/ folder as unpacked extension at chrome://extensions'
+  build_behavior:
+    - Auto-increments patch version on each build
+    - Bundles all entry points with esbuild
+    - Copies assets and HTML to dist/
+  version_note: 'Current auto-increment is dev convenience; use semantic versioning for release'
