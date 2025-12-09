@@ -3,9 +3,14 @@ import chokidar from 'chokidar';
 import fs from 'fs';
 import path from 'path';
 import {exec} from 'child_process';
+
 const srcDir = './src';
 const distDir = './dist';
 const manifestPath = './manifest.json';
+
+// Parse command line args
+const args = process.argv.slice(2);
+const watchMode = args.includes('--watch') || args.includes('-w');
 
 const entryPoints = [
     './src/scripts/content-script.ts',
@@ -90,11 +95,16 @@ const build = () => {
 // Initial build
 build();
 
-// Watch for file changes in src directory
-chokidar.watch(srcDir).on('change', (event, path) => {
-    console.log(`Rebuilding => File ${event} has been changed`);
-    build();
-});
+// Watch for file changes in src directory (only in watch mode)
+if (watchMode) {
+    console.log('Watching for changes...');
+    chokidar.watch(srcDir).on('change', (event, path) => {
+        console.log(`Rebuilding => File ${event} has been changed`);
+        build();
+    });
+} else {
+    console.log('Build complete.');
+}
 
 
 // Function to ensure directory exists

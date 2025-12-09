@@ -41,6 +41,7 @@ export interface Fisheye {
   run: (animate: boolean, callback?: () => void) => void;
   getImage: (format?: string) => HTMLImageElement;
   setImage: (imageUrl: string, callback?: () => void) => void;
+  setCanvasSource: (sourceCanvas: HTMLCanvasElement) => void;
   getCanvasDataUrl: () => string;
   getCanvas: () => HTMLCanvasElement;
 }
@@ -261,28 +262,30 @@ function FisheyeGl(options: Options): Fisheye {
   }
 
   function run(animate: boolean, callback?: () => void) {
-    var f = window.requestAnimationFrame || (window as any).mozRequestAnimationFrame ||
-      (window as any).webkitRequestAnimationFrame || (window as any).msRequestAnimationFrame;
-
-    // ugh
     if (animate === true) {
-      if (f) {
-        f(on);
-      } else {
-        throw new Error("do not support 'requestAnimationFram'");
-      }
-    } else {
-      f(on);
-    }
+      // Animation mode: use requestAnimationFrame loop
+      var f = window.requestAnimationFrame || (window as any).mozRequestAnimationFrame ||
+        (window as any).webkitRequestAnimationFrame || (window as any).msRequestAnimationFrame;
 
-    let current: number | null = null;
-    function on(t: number) {
-      if (!current) current = t;
-      var dt = t - current;
-      current = t;
-      options.runner!(dt);
+      if (!f) {
+        throw new Error("do not support 'requestAnimationFrame'");
+      }
+
+      let current: number | null = null;
+      function on(t: number) {
+        if (!current) current = t;
+        var dt = t - current;
+        current = t;
+        options.runner!(dt);
+        if (callback) callback();
+        if (animate === true) f(on);
+      }
+
+      f(on);
+    } else {
+      // Single-frame mode: render synchronously
+      options.runner!(0);
       if (callback) callback();
-      if (animate === true) f(on);
     }
   }
 
@@ -330,6 +333,31 @@ function FisheyeGl(options: Options): Fisheye {
     });
   }
 
+  /**
+   * Load a canvas directly as a texture source and render synchronously.
+   * This bypasses the async Image loading entirely.
+   */
+  function setCanvasSource(sourceCanvas: HTMLCanvasElement): void {
+    // Bind and upload the canvas directly to the WebGL texture
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
+
+    // Set texture parameters
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    // Update dimensions to match source canvas
+    options.width = sourceCanvas.width;
+    options.height = sourceCanvas.height;
+    resize(options.width, options.height);
+
+    // Render synchronously (single-frame mode)
+    run(false);
+  }
+
   setImage(image);
 
   // asynchronous!
@@ -364,6 +392,7 @@ function FisheyeGl(options: Options): Fisheye {
     run: run,
     getImage: getImage,
     setImage: setImage,
+    setCanvasSource: setCanvasSource,
     getCanvasDataUrl: getCanvasDataUrl,
     getCanvas: getCanvas,
   }

@@ -144,8 +144,20 @@ export function useMediaCapture(
     setIsCapturing(true);
     setError(null);
 
+    // Wait for React to re-render and browser to paint (lens hidden)
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          resolve();
+        });
+      });
+    });
+
+    // Additional delay for the tab capture stream to reflect the updated screen
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     try {
-      console.log('[useMediaCapture] Grabbing frame');
+      console.log('[useMediaCapture] Grabbing frame (after hide delay)');
       const rawBitmap = await activeImageCaptureRef.current.grabFrame();
       console.log('[useMediaCapture] Frame grabbed successfully');
 
