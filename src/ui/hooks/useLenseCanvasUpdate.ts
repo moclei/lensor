@@ -134,7 +134,7 @@ export function useLenseCanvasUpdate({
 
     if (fisheyeOn) {
       console.log('[useLenseCanvasUpdate] Drawing with fisheye effect');
-      // Fisheye rendering logic
+      // Draw the zoomed image to the intermediate canvas first
       interCtx.drawImage(
         imageBitmap,
         sourceX,
@@ -146,8 +146,8 @@ export function useLenseCanvasUpdate({
         CANVAS_SIZE,
         CANVAS_SIZE
       );
-      const fisheyeImageDataUrl = interCanvasRef.current.toDataURL();
 
+      // Create FisheyeGl instance if needed
       if (!distorterRef.current) {
         distorterRef.current = FisheyeGl({
           canvas: fisheyeCanvasRef.current,
@@ -165,7 +165,8 @@ export function useLenseCanvasUpdate({
         });
       }
 
-      distorterRef.current.setImage(fisheyeImageDataUrl);
+      // Use setCanvasSource for synchronous rendering (no Image loading, no rAF delay)
+      distorterRef.current.setCanvasSource(interCanvasRef.current);
       mainCtx.drawImage(distorterRef.current.getCanvas(), 0, 0);
     } else {
       console.log('[useLenseCanvasUpdate] Drawing without fisheye');

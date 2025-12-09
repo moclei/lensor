@@ -14,9 +14,17 @@ import {
   SwatchRow,
   ColorSwatch,
   CopyTooltip,
-  CurrentColorBadge
+  CurrentColorSection,
+  CurrentColorSwatch,
+  CurrentColorHex,
+  CurrentColorLabel,
+  CurrentColorInfo,
+  DrawerPosition
 } from './ControlDrawer.styles';
 import { parseRgbColor, rgbToHex } from '@/ui/utils/color-utils';
+
+// Re-export the type for consumers
+export type { DrawerPosition };
 
 // Helper to convert rgb string to hex
 function rgbStringToHex(rgbStr: string): string {
@@ -29,7 +37,9 @@ function rgbStringToHex(rgbStr: string): string {
 interface ControlDrawerProps {
   canvasSize: number;
   accentColor: string;
+  position?: DrawerPosition;
   // State values
+  isOpen: boolean;
   gridOn: boolean;
   fisheyeOn: boolean;
   zoom: number;
@@ -37,6 +47,7 @@ interface ControlDrawerProps {
   colorPalette: string[];
   materialPalette: Record<number, string>;
   // State setters
+  onToggle: () => void;
   onGridToggle: () => void;
   onFisheyeToggle: () => void;
   onZoomChange: (newZoom: number) => void;
@@ -48,22 +59,20 @@ const MAX_ZOOM = 16;
 export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   canvasSize,
   accentColor,
+  position = 'bottom',
+  isOpen,
   gridOn,
   fisheyeOn,
   zoom,
   hoveredColor,
   colorPalette,
   materialPalette,
+  onToggle,
   onGridToggle,
   onFisheyeToggle,
   onZoomChange
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [copyTooltip, setCopyTooltip] = useState<string | null>(null);
-
-  const handleToggle = useCallback(() => {
-    setIsOpen((prev) => !prev);
-  }, []);
 
   const handleZoomIn = useCallback(() => {
     if (zoom < MAX_ZOOM) {
@@ -99,32 +108,42 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
     .slice(0, 6); // Show max 6 swatches
 
   return (
-    <DrawerContainer canvasSize={canvasSize}>
-      {/* Current color badge - always visible */}
-      <CurrentColorBadge
-        color={accentColor}
-        onClick={() => copyToClipboard(hoveredColor)}
-        title="Click to copy"
-      >
-        {hexColor.toUpperCase()}
-      </CurrentColorBadge>
-
+    <DrawerContainer canvasSize={canvasSize} position={position}>
       {/* Pull tab */}
       <PullTab
         accentColor={accentColor}
         isOpen={isOpen}
-        onClick={handleToggle}
+        position={position}
+        onClick={onToggle}
         title={isOpen ? 'Close controls' : 'Open controls'}
       />
 
       {/* Drawer panel */}
-      <DrawerPanel isOpen={isOpen} accentColor={accentColor}>
+      <DrawerPanel
+        isOpen={isOpen}
+        accentColor={accentColor}
+        position={position}
+      >
         <DrawerContent>
+          {/* Current color display */}
+          <CurrentColorSection>
+            <CurrentColorSwatch
+              color={hoveredColor}
+              onClick={() => copyToClipboard(hoveredColor)}
+              title="Click to copy"
+            />
+            <CurrentColorInfo>
+              <CurrentColorLabel>Current Color</CurrentColorLabel>
+              <CurrentColorHex color={hoveredColor}>
+                {hexColor.toUpperCase()}
+              </CurrentColorHex>
+            </CurrentColorInfo>
+          </CurrentColorSection>
+
           {/* Toggle controls row */}
           <ControlsRow>
             <ToggleButton
               isActive={gridOn}
-              accentColor={accentColor}
               onClick={onGridToggle}
               title="Toggle grid overlay"
             >
@@ -133,7 +152,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
 
             <ToggleButton
               isActive={fisheyeOn}
-              accentColor={accentColor}
               onClick={onFisheyeToggle}
               title="Toggle fisheye effect"
             >
@@ -190,13 +208,10 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
 
       {/* Copy tooltip */}
       {copyTooltip && (
-        <CopyTooltip visible={!!copyTooltip}>
-          Copied {copyTooltip}
-        </CopyTooltip>
+        <CopyTooltip visible={!!copyTooltip}>Copied {copyTooltip}</CopyTooltip>
       )}
     </DrawerContainer>
   );
 };
 
 export default ControlDrawer;
-

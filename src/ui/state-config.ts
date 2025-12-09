@@ -32,15 +32,15 @@ export const LensorStateConfig = {
   },
   showGrid: {
     default: false,
-    partition: Partition.Service
+    partition: Partition.Instance
   },
   showFisheye: {
     default: false,
-    partition: Partition.Service
+    partition: Partition.Instance
   },
   zoom: {
     default: 3,
-    partition: Partition.Service
+    partition: Partition.Instance
   },
   captureCount: {
     default: 0,
