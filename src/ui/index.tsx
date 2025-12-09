@@ -7,6 +7,9 @@ import { connect } from 'crann';
 import { LensorStateConfig } from './state-config';
 
 console.log('Injected Lensor UI mounted');
+
+const LENSOR_CONTAINER_ID = 'lensor-shadow-container';
+
 const styles = {
   container: {
     shadow: {
@@ -37,9 +40,21 @@ type LensorState = {
   imageBitmap: ImageBitmap | null;
 };
 
+// Check if we already have a container in the DOM (from a previous injection)
+function getOrCreateContainer(): HTMLDivElement {
+  const existing = document.getElementById(LENSOR_CONTAINER_ID) as HTMLDivElement | null;
+  if (existing) {
+    console.log('[UI] Found existing container, removing it for fresh start');
+    existing.remove();
+  }
+  const container = document.createElement('div');
+  container.id = LENSOR_CONTAINER_ID;
+  return container;
+}
+
 const state: LensorState = {
   active: false,
-  shadowContainer: document.createElement('div'),
+  shadowContainer: getOrCreateContainer(),
   shadowRoot: null,
   videoElement: null,
   scale: 1,
@@ -109,7 +124,6 @@ function initializeReact() {
   uiRoot.style.height = '100%';
 
   shadowRoot.appendChild(uiRoot);
-  // injectFontFace();
 
   console.log('[UI] initializeReact() creating root');
   if (styleSlot) {

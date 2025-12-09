@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { FaGripVertical } from 'react-icons/fa6';
 import { useLensorState } from '../../hooks/useLensorState';
 import { useDraggable } from '@/ui/hooks/useDraggable';
 import {
@@ -7,8 +6,6 @@ import {
   detectPixelColor
 } from '../../hooks/useColorDetection';
 import {
-  ButtonSegment,
-  GearButton,
   GridCanvas,
   HiddenCanvas,
   LenseContainer,
@@ -26,6 +23,7 @@ import {
   hexToRgba
 } from '@/ui/utils/color-utils';
 import Handle from './Handle';
+import ControlDrawer from './ControlDrawer';
 const CANVAS_SIZE = 400;
 
 interface LenseProps {
@@ -45,17 +43,15 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const { useStateItem } = useLensorState();
-  const [isSidepanelShown, setIsSidepanelShown] =
-    useStateItem('isSidepanelShown');
   const [lensePosition, setLensePosition] = useStateItem('lensePosition');
 
   const [colorPalette, setColorPalette] = useStateItem('colorPalette');
   const [materialPalette, setMaterialPalette] = useStateItem('materialPalette');
   const [hoveredColor, setHoveredColor] = useStateItem('hoveredColor');
 
-  const [gridOn] = useStateItem('showGrid');
-  const [fisheyeOn] = useStateItem('showFisheye');
-  const [zoom] = useStateItem('zoom');
+  const [gridOn, setGridOn] = useStateItem('showGrid');
+  const [fisheyeOn, setFisheyeOn] = useStateItem('showFisheye');
+  const [zoom, setZoom] = useStateItem('zoom');
   const [active] = useStateItem('active');
 
   console.log('[Lense] active state:', active);
@@ -187,13 +183,18 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     zoom
   ]);
 
-  const handleGearClick = useCallback(() => {
-    console.log(
-      'handleGearClick. Setting isSidepanelShown to: ',
-      !isSidepanelShown
-    );
-    setIsSidepanelShown(!isSidepanelShown);
-  }, [isSidepanelShown, setIsSidepanelShown]);
+  // Control drawer callbacks
+  const handleGridToggle = useCallback(() => {
+    setGridOn(!gridOn);
+  }, [gridOn, setGridOn]);
+
+  const handleFisheyeToggle = useCallback(() => {
+    setFisheyeOn(!fisheyeOn);
+  }, [fisheyeOn, setFisheyeOn]);
+
+  const handleZoomChange = useCallback((newZoom: number) => {
+    setZoom(newZoom);
+  }, [setZoom]);
 
   useEffect(() => {
     console.log('[Lense] Grid effect triggered');
@@ -250,16 +251,22 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         hoveredColor={hoveredColor}
         patternName="diagonal"
         style={{ display: canvasesVisible ? 'block' : 'none' }}
-      >
-        <ButtonSegment id="lensor-btn-segment">
-          <GearButton onClick={handleGearClick}>
-            <FaGripVertical
-              size={'lg'}
-              color={materialPalette?.[50] || '#000000'}
-            />
-          </GearButton>
-        </ButtonSegment>
-      </Handle>
+      />
+      {canvasesVisible && (
+        <ControlDrawer
+          canvasSize={CANVAS_SIZE}
+          accentColor={materialPalette?.[500] || hoveredColor}
+          gridOn={gridOn}
+          fisheyeOn={fisheyeOn}
+          zoom={zoom}
+          hoveredColor={hoveredColor}
+          colorPalette={colorPalette}
+          materialPalette={materialPalette}
+          onGridToggle={handleGridToggle}
+          onFisheyeToggle={handleFisheyeToggle}
+          onZoomChange={handleZoomChange}
+        />
+      )}
       {debugMode && (
         <DebugOverlay
           imageBitmap={currentImage}
