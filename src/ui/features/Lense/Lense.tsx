@@ -22,7 +22,8 @@ import { useCanvasLifecycle } from '@/ui/hooks/useCanvasLifecycle';
 import {
   convertToGrayscalePreservingFormat,
   hexToRgba,
-  getSubtleTextureColor
+  getSubtleTextureColor,
+  getGridContrastColor
 } from '@/ui/utils/color-utils';
 import Handle from './Handle';
 import ControlDrawer, { DrawerPosition } from './ControlDrawer';
@@ -148,11 +149,14 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     fisheyeOn
   });
 
+  const gridContrastColor = getGridContrastColor(hoveredColor);
+
   const { drawGrid, drawCrosshairs } = useGrid({
     canvasRef: gridCanvasRef,
     isGridVisible: gridOn,
     canvasSize: CANVAS_SIZE,
-    zoom
+    zoom,
+    gridColor: gridContrastColor
   });
 
   useDraggable({
@@ -280,7 +284,8 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   useEffect(() => {
     console.log('[Lense] Grid effect triggered');
     drawGrid();
-  }, [gridOn, scale, zoom, drawGrid]);
+    drawCrosshairs({ color: gridContrastColor });
+  }, [gridOn, scale, zoom, drawGrid, drawCrosshairs, gridContrastColor]);
 
   if (!active) return;
   if (isCapturing) return;

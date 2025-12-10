@@ -148,6 +148,21 @@ export const getContrastColorFromRGB = (color: string): string => {
   return luminance > 0.5 ? '#000000' : '#ffffff';
 };
 
+// Grid-specific contrast function with lower threshold
+// Only switches to white grid for very dark colors (luminance < 0.3)
+export const getGridContrastColor = (color: string): string => {
+  const rgbMatch = color.match(/\d+/g);
+  if (!rgbMatch || rgbMatch.length !== 3) {
+    return '#000000'; // Default to black grid
+  }
+
+  const [r, g, b] = rgbMatch.map(Number);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Use white grid only for very dark colors
+  return luminance < 0.3 ? '#ffffff' : '#000000';
+};
+
 // Convert RGB to HSL
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255;
