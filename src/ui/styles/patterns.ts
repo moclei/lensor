@@ -5,6 +5,10 @@ export interface PatternOptions {
   baseColor: string;
   contrastColor: string;
   contrastColor2?: string;
+  textureHighlight?: string;
+  textureHighlightBright?: string;
+  textureHighlightBrightest?: string;
+  textureShadow?: string;
 }
 
 export type PatternFunction = (
@@ -17,11 +21,8 @@ export const patterns: Record<string, PatternFunction> = {
   diamonds: ({ baseColor, contrastColor }) => css`
     background-color: ${baseColor};
     opacity: 1;
-    background-image: linear-gradient(
-        135deg,
-        ${contrastColor} 25%,
-        transparent 25%
-      ),
+    background-image:
+      linear-gradient(135deg, ${contrastColor} 25%, transparent 25%),
       linear-gradient(225deg, ${contrastColor} 25%, transparent 25%),
       linear-gradient(45deg, ${contrastColor} 25%, transparent 25%),
       linear-gradient(315deg, ${contrastColor} 25%, ${baseColor} 25%);
@@ -38,7 +39,8 @@ export const patterns: Record<string, PatternFunction> = {
   lines: ({ baseColor, contrastColor }) => css`
     background-color: ${baseColor};
     opacity: 0.8;
-    background-image: linear-gradient(
+    background-image:
+      linear-gradient(
         30deg,
         ${contrastColor} 12%,
         transparent 12.5%,
@@ -114,7 +116,8 @@ export const patterns: Record<string, PatternFunction> = {
   boxes: ({ baseColor, contrastColor }) => css`
     background-color: ${baseColor};
     opacity: 0.8;
-    background-image: linear-gradient(${baseColor} 1px, transparent 1px),
+    background-image:
+      linear-gradient(${baseColor} 1px, transparent 1px),
       linear-gradient(to right, ${baseColor} 1px, ${contrastColor} 1px);
     background-size: 20px 20px;
   `,
@@ -130,7 +133,82 @@ export const patterns: Record<string, PatternFunction> = {
       ${contrastColor} 50%
     );
     background-size: 10px 10px;
-  `
+  `,
+
+  // Pattern: Knurling - simulates machined metal grip texture
+  // Creates crosshatch with 3D embossed effect using highlight/lowlight accents
+  knurling: ({
+    baseColor,
+    textureHighlightBright,
+    textureHighlightBrightest,
+    textureShadow
+  }) => {
+    const highlightBright =
+      textureHighlightBright || 'rgba(255, 255, 255, 0.3)';
+    const highlightBrightest =
+      textureHighlightBrightest || 'rgba(255, 255, 255, 0.4)';
+    const shadow = textureShadow || 'rgba(0, 0, 0, 0.3)';
+
+    // Pattern dimensions
+    const lineSpacing = 6;
+    const lineWidth = 4;
+    const accentWidth = lineWidth / 3;
+    const crissAngle = 30;
+    const crossAngle = -30;
+
+    return css`
+      background-color: ${baseColor};
+      background-image:
+        /* knurl2-criss-highlight */
+        repeating-linear-gradient(
+          ${crissAngle}deg,
+          transparent,
+          transparent ${lineSpacing}px,
+          ${highlightBright} ${lineSpacing}px,
+          ${highlightBright} ${lineSpacing + accentWidth}px,
+          transparent ${lineSpacing + accentWidth}px,
+          transparent ${lineSpacing + lineWidth}px
+        ),
+        /* knurl2-cross-highlight */
+          repeating-linear-gradient(
+            ${crossAngle}deg,
+            transparent,
+            transparent ${lineSpacing}px,
+            ${highlightBrightest} ${lineSpacing}px,
+            ${highlightBrightest} ${lineSpacing + accentWidth}px,
+            transparent ${lineSpacing + accentWidth}px,
+            transparent ${lineSpacing + lineWidth}px
+          ),
+        /* knurl2-cross-lowlight */
+          repeating-linear-gradient(
+            ${crossAngle}deg,
+            transparent,
+            transparent ${lineSpacing + accentWidth}px,
+            ${shadow} ${lineSpacing + accentWidth * 3}px,
+            ${shadow} ${lineSpacing + accentWidth * 2}px,
+            transparent ${lineSpacing + accentWidth * 2}px,
+            transparent ${lineSpacing + lineWidth}px
+          ),
+        /* knurl2-cross base */
+          repeating-linear-gradient(
+            ${crossAngle}deg,
+            transparent,
+            transparent ${lineSpacing}px,
+            ${highlightBright} ${lineSpacing}px,
+            ${highlightBright} ${lineSpacing + lineWidth}px
+          ),
+        /* knurl2-criss-lowlight */
+          repeating-linear-gradient(
+            ${crissAngle}deg,
+            transparent,
+            transparent ${lineSpacing + accentWidth}px,
+            ${shadow} ${lineSpacing + accentWidth}px,
+            ${shadow} ${lineSpacing + accentWidth * 2}px,
+            transparent ${lineSpacing + accentWidth * 2}px,
+            transparent ${lineSpacing + lineWidth}px
+          );
+    `;
+  }
 };
 
 // Utility function to get a pattern by name

@@ -45,6 +45,29 @@ const HiddenCanvas = styled.canvas`
   display: none;
 `;
 
+/* Glass effect overlay - sits on top of canvas to add lens realism */
+const GlassOverlay = styled.div<{ visible: boolean }>`
+  position: absolute;
+  z-index: 9;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  pointer-events: none;
+  display: ${(props) => (props.visible ? 'block' : 'none')};
+  
+  /* #1: Vignette - darkens edges like real lens light falloff */
+  background: radial-gradient(
+    circle at center,
+    transparent 55%,
+    rgba(0, 0, 0, 0.08) 70%,
+    rgba(0, 0, 0, 0.2) 85%,
+    rgba(0, 0, 0, 0.35) 100%
+  );
+  
+  /* #3: Inner frame shadow - frame casts shadow onto glass */
+  box-shadow: inset 0 0 20px 8px rgba(0, 0, 0, 0.25);
+`;
+
 const ButtonSegment = styled.div`
   position: absolute;
   width: 100%;
@@ -115,6 +138,7 @@ export {
   MainCanvas,
   GridCanvas,
   HiddenCanvas,
+  GlassOverlay,
   ButtonSegment,
   GearButton,
   LenseContainer

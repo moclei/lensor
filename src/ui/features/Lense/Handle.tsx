@@ -9,7 +9,12 @@ export interface RingHandleStyleProps {
   contrastColor: string;
   contrastColor2: string;
   hoveredColor: string;
+  textureHighlight?: string;
+  textureHighlightBright?: string;
+  textureHighlightBrightest?: string;
+  textureShadow?: string;
   patternName?: keyof typeof patterns;
+  patternOpacity?: number;
   shadowColor?: string;
 }
 
@@ -27,6 +32,28 @@ export const StyledRingHandle = styled.div<RingHandleStyleProps>`
   pointer-events: auto;
   background-color: transparent;
 
+  /* Solid base color layer (hovered pixel color) with raised/skeuomorphic edges */
+  &::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: ${(props) => props.hoveredColor};
+    pointer-events: none;
+    box-shadow:
+      /* Outer drop shadow - element sits above the page */
+      3px 4px 8px rgba(0, 0, 0, 0.4),
+      1px 2px 3px rgba(0, 0, 0, 0.3),
+      /* Outer highlight - top-left edge catches light */ -1px -1px 1px
+        rgba(255, 255, 255, 0.15),
+      /* Inner edge - shadow at BOTTOM of hole (ring casts shadow down into hole) */
+        inset -2px -3px 6px rgba(0, 0, 0, 0.35),
+      /* Inner edge - highlight at TOP of hole (light enters from above) */
+        inset 1px 2px 3px rgba(255, 255, 255, 0.1);
+  }
+
+  /* Pattern overlay layer (with adjustable opacity) */
   &::after {
     content: '';
     position: absolute;
@@ -34,11 +61,17 @@ export const StyledRingHandle = styled.div<RingHandleStyleProps>`
     height: 100%;
     border-radius: 50%;
     pointer-events: auto;
+    opacity: ${(props) => props.patternOpacity ?? 1};
+    background-color: transparent;
 
     ${(props) =>
-      getPattern(props.patternName || 'diamonds', {
-        baseColor: props.hoveredColor,
-        contrastColor: props.contrastColor2
+      getPattern(props.patternName || 'knurling', {
+        baseColor: 'transparent',
+        contrastColor: props.contrastColor2,
+        textureHighlight: props.textureHighlight,
+        textureHighlightBright: props.textureHighlightBright,
+        textureHighlightBrightest: props.textureHighlightBrightest,
+        textureShadow: props.textureShadow
       })}
   }
 `;
@@ -92,7 +125,12 @@ export const Handle = forwardRef<HTMLDivElement, RingHandleProps>(
       contrastColor,
       contrastColor2,
       hoveredColor,
-      patternName = 'diamonds',
+      textureHighlight,
+      textureHighlightBright,
+      textureHighlightBrightest,
+      textureShadow,
+      patternName = 'knurling',
+      patternOpacity = 1,
       visible,
       shadowColor,
       ...restProps
@@ -109,7 +147,12 @@ export const Handle = forwardRef<HTMLDivElement, RingHandleProps>(
         contrastColor={contrastColor}
         contrastColor2={contrastColor2}
         hoveredColor={hoveredColor}
+        textureHighlight={textureHighlight}
+        textureHighlightBright={textureHighlightBright}
+        textureHighlightBrightest={textureHighlightBrightest}
+        textureShadow={textureShadow}
         patternName={patternName}
+        patternOpacity={patternOpacity}
         shadowColor={shadowColor}
         {...restProps}
       >
