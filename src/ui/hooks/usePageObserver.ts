@@ -1,4 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { debug } from '../../lib/debug';
+
+const log = debug.observer;
 
 // Simple debounce utility
 function useDebounce<T>(value: T, delay: number): T {
@@ -141,35 +144,23 @@ export function usePageObservers(
 
     // Increase the score based on scroll distance
     setScrollChangeScore((prev) => prev + deltaY * 0.1 + deltaX * 0.05);
-
-    console.log(
-      'Scroll event detected, new score:',
-      scrollChangeScore + deltaY * 0.1 + deltaX * 0.05
-    );
-  }, [scrollChangeScore]);
+  }, []);
 
   // Handle DOM mutations
-  const handleDOMMutation = useCallback(
-    (mutations: MutationRecord[]) => {
-      let scoreIncrement = 0;
+  const handleDOMMutation = useCallback((mutations: MutationRecord[]) => {
+    let scoreIncrement = 0;
 
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'childList') {
-          scoreIncrement += mutation.addedNodes.length * 2;
-          scoreIncrement += mutation.removedNodes.length;
-        } else if (mutation.type === 'attributes') {
-          scoreIncrement += 0.5;
-        }
-      });
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'childList') {
+        scoreIncrement += mutation.addedNodes.length * 2;
+        scoreIncrement += mutation.removedNodes.length;
+      } else if (mutation.type === 'attributes') {
+        scoreIncrement += 0.5;
+      }
+    });
 
-      setMutationChangeScore((prev) => prev + scoreIncrement);
-      console.log(
-        'Mutation detected, new score:',
-        mutationChangeScore + scoreIncrement
-      );
-    },
-    [mutationChangeScore]
-  );
+    setMutationChangeScore((prev) => prev + scoreIncrement);
+  }, []);
 
   // Handle resize events
   const handleResize = useCallback(() => {
@@ -189,12 +180,7 @@ export function usePageObservers(
     // Update score based on size changes
     const scoreIncrement = widthChange * 0.1 + heightChange * 0.2;
     setResizeChangeScore((prev) => prev + scoreIncrement);
-
-    console.log(
-      'Resize detected, new score:',
-      resizeChangeScore + scoreIncrement
-    );
-  }, [viewportSize, resizeChangeScore]);
+  }, [viewportSize]);
 
   // Set up scroll listener
   useEffect(() => {
@@ -235,7 +221,7 @@ export function usePageObservers(
       debouncedScrollScore > scrollThreshold &&
       !isProcessingScrollRef.current
     ) {
-      console.log('SCROLL THRESHOLD EXCEEDED:', debouncedScrollScore);
+      log('Scroll threshold exceeded: %d', debouncedScrollScore);
       // Set processing flag to prevent multiple calls
       isProcessingScrollRef.current = true;
 
@@ -260,7 +246,7 @@ export function usePageObservers(
       debouncedMutationScore > mutationThreshold &&
       !isProcessingMutationRef.current
     ) {
-      console.log('MUTATION THRESHOLD EXCEEDED:', debouncedMutationScore);
+      log('Mutation threshold exceeded: %d', debouncedMutationScore);
       // Set processing flag to prevent multiple calls
       isProcessingMutationRef.current = true;
 
@@ -284,7 +270,7 @@ export function usePageObservers(
       debouncedResizeScore > resizeThreshold &&
       !isProcessingResizeRef.current
     ) {
-      console.log('RESIZE THRESHOLD EXCEEDED:', debouncedResizeScore);
+      log('Resize threshold exceeded: %d', debouncedResizeScore);
       // Set processing flag to prevent multiple calls
       isProcessingResizeRef.current = true;
 

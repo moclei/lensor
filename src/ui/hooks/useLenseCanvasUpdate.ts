@@ -2,6 +2,9 @@ import { useState, useCallback, useRef } from 'react';
 import FisheyeGl, { Fisheye } from '../../lib/fisheyegl';
 import { DebugInfoProps } from '../utils/debug-utils';
 import { useLensorState } from './useLensorState';
+import { debug } from '../../lib/debug';
+
+const log = debug.canvas;
 
 interface UseLenseCanvasUpdateProps {
   imageBitmap: ImageBitmap | null;
@@ -22,12 +25,6 @@ export function useLenseCanvasUpdate({
   zoom,
   fisheyeOn
 }: UseLenseCanvasUpdateProps) {
-  console.log('[useLenseCanvasUpdate] Hook called with:', {
-    hasImage: !!imageBitmap,
-    zoom,
-    fisheyeOn
-  });
-
   const distorterRef = useRef<Fisheye | null>(null);
   const CANVAS_SIZE = 400;
 
@@ -40,9 +37,6 @@ export function useLenseCanvasUpdate({
 
   const calculateCropCoordinates = useCallback(() => {
     if (!containerRef.current || !imageBitmap) {
-      console.log(
-        '[useLenseCanvasUpdate] calculateCropCoordinates skipping because not initialized'
-      );
       return {
         sourceX: 0,
         sourceY: 0,
@@ -81,40 +75,16 @@ export function useLenseCanvasUpdate({
     const sourceW = captureWidth;
     const sourceH = captureHeight;
 
-    console.log('[Zoom Analysis]', {
-      userZoomLevel,
-      cssPixelsToShow,
-      capturedPixelsToShow,
-      viewportSize: { width: window.innerWidth, height: window.innerHeight },
-      imageBitmapSize: { width: imageBitmap.width, height: imageBitmap.height },
-      scaleFactors: { scaleWidth, scaleHeight },
-      devicePixelRatio: window.devicePixelRatio,
-      cropSize: { captureWidth, captureHeight },
-      implicitZoom: scaleWidth // This is your actual zoom factor!
-    });
-
-    const result = {
+    return {
       sourceX: captureTopLeftX,
       sourceY: captureTopLeftY,
       sourceW,
       sourceH
     };
-
-    console.log('[useLenseCanvasUpdate] Calculated crop coordinates:', result);
-    return result;
   }, [imageBitmap, containerRef, zoom]);
 
   const updateCanvas = useCallback((): string | null => {
-    console.log('[useLenseCanvasUpdate] updateCanvas called with state:', {
-      hasMainCanvas: !!mainCanvasRef.current,
-      hasInterCanvas: !!interCanvasRef.current,
-      hasImage: !!imageBitmap
-    });
-
     if (!mainCanvasRef.current || !interCanvasRef.current || !imageBitmap) {
-      console.log(
-        '[useLenseCanvasUpdate] updateCanvas skipping because not initialized'
-      );
       return null;
     }
 
@@ -122,18 +92,16 @@ export function useLenseCanvasUpdate({
     const interCtx = interCanvasRef.current.getContext('2d');
 
     if (!mainCtx || !interCtx) {
-      console.log('[useLenseCanvasUpdate] updateCanvas failed to get context');
+      log('Failed to get canvas context');
       return null;
     }
 
-    console.log('[useLenseCanvasUpdate] Clearing canvases');
     mainCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     interCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
     const { sourceX, sourceY, sourceW, sourceH } = calculateCropCoordinates();
 
     if (fisheyeOn) {
-      console.log('[useLenseCanvasUpdate] Drawing with fisheye effect');
       // Draw the zoomed image to the intermediate canvas first
       interCtx.drawImage(
         imageBitmap,
@@ -169,7 +137,6 @@ export function useLenseCanvasUpdate({
       distorterRef.current.setCanvasSource(interCanvasRef.current);
       mainCtx.drawImage(distorterRef.current.getCanvas(), 0, 0);
     } else {
-      console.log('[useLenseCanvasUpdate] Drawing without fisheye');
       try {
         mainCtx.drawImage(
           imageBitmap,
@@ -182,7 +149,6 @@ export function useLenseCanvasUpdate({
           CANVAS_SIZE,
           CANVAS_SIZE
         );
-        console.log('[useLenseCanvasUpdate] Successfully drew image on canvas');
       } catch (error) {
         console.error('[useLenseCanvasUpdate] Error drawing image:', error);
         return null;
@@ -190,7 +156,6 @@ export function useLenseCanvasUpdate({
     }
 
     const color = updateSelectedPixel(mainCtx);
-    console.log('[useLenseCanvasUpdate] Selected pixel color:', color);
     return color;
   }, [
     mainCanvasRef,

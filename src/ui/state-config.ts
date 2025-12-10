@@ -1,5 +1,8 @@
 import { Partition } from 'crann';
 import { BrowserLocation } from 'porter-source';
+import { debug } from '../lib/debug';
+
+const log = debug.state;
 
 export const LensorStateConfig = {
   active: {
@@ -56,15 +59,13 @@ export const LensorStateConfig = {
       setState: (newState: Partial<any>) => Promise<void>,
       target: BrowserLocation
     ) => {
-      console.log('Getting media stream id for target: ', { target });
+      log('Getting media stream ID for tab: %d', target.tabId);
       const mediaStreamId = await (chrome.tabCapture as any).getMediaStreamId({
         consumerTabId: target.tabId,
         targetTabId: target.tabId
       });
 
-      console.log(
-        'Crann instance ready was the one we wanted. Setting mediaStreamId'
-      );
+      log('Media stream ID obtained');
       return mediaStreamId;
     },
     validate: (amount: number) => {

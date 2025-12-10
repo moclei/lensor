@@ -1,4 +1,7 @@
 import { useCallback, useRef, useEffect } from 'react';
+import { debug } from '../../lib/debug';
+
+const log = debug.drag;
 
 interface UseDraggableOptions {
   movableElementRef: React.RefObject<HTMLElement>;
@@ -31,23 +34,9 @@ export function useDraggable({
   const listenerAttached = useRef(false);
 
   // Store event handler functions in refs so they don't change between renders
-  const onMouseMoveRef = useRef<(e: MouseEvent) => void>((e: MouseEvent) => {
-    console.log(
-      '[useDraggable] Default mouseMove handler called - this should not happen'
-    );
-  });
-
-  const onMouseUpRef = useRef<() => void>(() => {
-    console.log(
-      '[useDraggable] Default mouseUp handler called - this should not happen'
-    );
-  });
-
-  const onMouseDownRef = useRef<(e: MouseEvent) => void>((e: MouseEvent) => {
-    console.log(
-      '[useDraggable] Default mouseDown handler called - this should not happen'
-    );
-  });
+  const onMouseMoveRef = useRef<(e: MouseEvent) => void>(() => {});
+  const onMouseUpRef = useRef<() => void>(() => {});
+  const onMouseDownRef = useRef<(e: MouseEvent) => void>(() => {});
 
   const effectiveDragHandleRef = dragHandleRef || movableElementRef;
 
@@ -97,28 +86,16 @@ export function useDraggable({
 
   const updatePosition = useCallback(
     (deltaX: number, deltaY: number) => {
-      console.log(
-        `[useDraggable] updatePosition called with delta: ${deltaX}, ${deltaY}`
-      );
       const movableElement = movableElementRef.current;
       if (!movableElement) {
-        console.warn(
-          '[useDraggable] updatePosition: movableElementRef is null!'
-        );
+        console.warn('[useDraggable] movableElementRef is null');
         return;
       }
-
-      console.log(
-        `[useDraggable] updatePosition: canvasPositionRef BEFORE calc: (${canvasPositionRef.current.x}, ${canvasPositionRef.current.y})`
-      );
 
       const newX = canvasPositionRef.current.x + deltaX;
       const newY = canvasPositionRef.current.y + deltaY;
 
       const { x, y } = constrainPosition(newX, newY);
-      console.log(
-        `[useDraggable] updatePosition: Setting position to: ${x}, ${y}`
-      );
       canvasPositionRef.current = { x, y };
 
       movableElement.style.left = `${x}px`;
@@ -144,12 +121,9 @@ export function useDraggable({
       return;
     }
 
-    console.log('[useDraggable] Setting up event handlers');
+    log('Setting up event handlers');
 
     onMouseMoveRef.current = (e: MouseEvent) => {
-      console.log(
-        `[useDraggable] onMouseMove Fired - isDragging: ${isDraggingRef.current}`
-      );
       if (!isDraggingRef.current) return;
 
       const prevMouseX = mousePositionRef.current.x;
@@ -160,18 +134,14 @@ export function useDraggable({
       const deltaX = currentMouseX - prevMouseX;
       const deltaY = currentMouseY - prevMouseY;
 
-      console.log(
-        `[useDraggable] MouseMove Details: Prev: (${prevMouseX}, ${prevMouseY}), Curr: (${currentMouseX}, ${currentMouseY}), Delta: (${deltaX}, ${deltaY})`
-      );
-
       mousePositionRef.current = { x: currentMouseX, y: currentMouseY };
 
       updatePosition(deltaX, deltaY);
     };
 
     onMouseUpRef.current = () => {
-      console.log('[useDraggable] onMouseUp - Drag End');
       if (isDraggingRef.current) {
+        log('Drag ended');
         onDragEnd(canvasPositionRef.current);
       }
       isDraggingRef.current = false;
@@ -180,16 +150,13 @@ export function useDraggable({
     };
 
     onMouseDownRef.current = (e: MouseEvent) => {
-      console.log('[useDraggable] onMouseDown Event Triggered');
+      log('Drag started');
       e.preventDefault();
       e.stopPropagation();
 
       isDraggingRef.current = true;
       mousePositionRef.current = { x: e.pageX, y: e.pageY };
 
-      console.log(
-        '[useDraggable] Adding document mousemove and mouseup listeners'
-      );
       document.addEventListener('mousemove', onMouseMoveRef.current);
       document.addEventListener('mouseup', onMouseUpRef.current);
     };
@@ -202,9 +169,6 @@ export function useDraggable({
     const dragHandle = effectiveDragHandleRef.current;
 
     if (!dragHandle) {
-      console.warn(
-        '[useDraggable] No drag handle available to attach listener'
-      );
       return false;
     }
 
@@ -216,7 +180,7 @@ export function useDraggable({
       }
     }
 
-    console.log('[useDraggable] Attaching mousedown listener to:', dragHandle);
+    log('Attaching mousedown listener');
 
     // Set a flag on the element to track if we've attached a listener
     (dragHandle as any)._hasMouseDownListener = true;
@@ -225,7 +189,6 @@ export function useDraggable({
     });
     listenerAttached.current = true;
 
-    console.log('[useDraggable] mousedown listener successfully attached');
     return true;
   }, [effectiveDragHandleRef]);
 
@@ -233,14 +196,10 @@ export function useDraggable({
   useEffect(() => {
     const checkAndAttachListener = () => {
       if (!handlersInitialized.current) {
-        console.log('[useDraggable] Handlers not initialized yet, waiting');
         return;
       }
 
-      const success = attachMouseDownListener();
-      if (!success) {
-        console.log('[useDraggable] Failed to attach listener, will retry');
-      }
+      attachMouseDownListener();
     };
 
     // Try to attach immediately
@@ -257,9 +216,6 @@ export function useDraggable({
           (mutation.attributeName === 'style' ||
             mutation.attributeName === 'class')
         ) {
-          console.log(
-            '[useDraggable] Element attributes changed, checking for listener reattachment'
-          );
           checkAndAttachListener();
         }
       });
@@ -285,7 +241,7 @@ export function useDraggable({
       if (listenerAttached.current) {
         const dragHandle = effectiveDragHandleRef.current;
         if (dragHandle) {
-          console.log('[useDraggable] Removing mousedown listener');
+          log('Removing mousedown listener');
           dragHandle.removeEventListener('mousedown', onMouseDownRef.current, {
             capture: true
           });
@@ -298,7 +254,6 @@ export function useDraggable({
   }, [attachMouseDownListener, effectiveDragHandleRef, movableElementRef]);
 
   useEffect(() => {
-    console.log('[useDraggable] Setting initial position:', initialPosition);
     canvasPositionRef.current = { x: initialPosition.x, y: initialPosition.y };
     const movableElement = movableElementRef.current;
     if (movableElement) {

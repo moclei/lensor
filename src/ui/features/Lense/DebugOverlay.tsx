@@ -96,14 +96,6 @@ export const DebugOverlay: React.FC<{
     }
   }, [imageBitmap]);
 
-  useEffect(() => {
-    console.log('colorPalette', colorPalette);
-  }, [colorPalette]);
-
-  useEffect(() => {
-    console.log('materialPalette', materialPalette);
-  }, [materialPalette]);
-
   return (
     <>
       <StyledDebugInfo>

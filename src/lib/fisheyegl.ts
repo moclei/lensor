@@ -46,7 +46,12 @@ export interface Fisheye {
   getCanvas: () => HTMLCanvasElement;
 }
 
-const CONTEXT_TYPES: string[] = ["webgl", "experimental-webgl", "webkit-3d", "moz-webgl"];
+const CONTEXT_TYPES: string[] = [
+  'webgl',
+  'experimental-webgl',
+  'webkit-3d',
+  'moz-webgl'
+];
 
 function FisheyeGl(options: Options): Fisheye {
   // Defaults:
@@ -56,24 +61,9 @@ function FisheyeGl(options: Options): Fisheye {
   options.height = options.height || 600;
 
   var model: Model = options.model || {
-    vertex: [
-      -1.0, -1.0, 0.0,
-      1.0, -1.0, 0.0,
-      1.0, 1.0, 0.0,
-      -1.0, 1.0, 0.0
-    ],
-    indices: [
-      0, 1, 2,
-      0, 2, 3,
-      2, 1, 0,
-      3, 2, 0
-    ],
-    textureCoords: [
-      0.0, 0.0,
-      1.0, 0.0,
-      1.0, 1.0,
-      0.0, 1.0
-    ]
+    vertex: [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0],
+    indices: [0, 1, 2, 0, 2, 3, 2, 1, 0, 3, 2, 0],
+    textureCoords: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]
   };
 
   var lens: Lens = options.lens || {
@@ -86,29 +76,44 @@ function FisheyeGl(options: Options): Fisheye {
   var fov: Fov = options.fov || {
     x: 1.0,
     y: 1.0
-  }
-  const image: string = options.image || "images/barrel-distortion.png";
+  };
+  const image: string = options.image || 'images/barrel-distortion.png';
 
-  const selector: string = options.selector || "#canvas";
+  const selector: string = options.selector || '#canvas';
   const canvas: HTMLCanvasElement | null = options.canvas || null;
   const gl: WebGLRenderingContext = getGLContext(selector);
 
-  const vertexSrc: string = loadFile(options.vertexSrc || "vertex");
-  const fragmentSrc: string = loadFile(options.fragmentSrc || "fragment3");
+  const vertexSrc: string = loadFile(options.vertexSrc || 'vertex');
+  const fragmentSrc: string = loadFile(options.fragmentSrc || 'fragment3');
 
-  const program: WebGLProgram = compileShader(gl, vertexSrc, fragmentSrc)
+  const program: WebGLProgram = compileShader(gl, vertexSrc, fragmentSrc);
   gl.useProgram(program);
 
-  const aVertexPosition: number = gl.getAttribLocation(program, "aVertexPosition");
-  const aTextureCoord: number = gl.getAttribLocation(program, "aTextureCoord");
-  const uSampler: WebGLUniformLocation | null = gl.getUniformLocation(program, "uSampler");
-  const uLensS: WebGLUniformLocation | null = gl.getUniformLocation(program, "uLensS");
-  const uLensF: WebGLUniformLocation | null = gl.getUniformLocation(program, "uLensF");
-  const uFov: WebGLUniformLocation | null = gl.getUniformLocation(program, "uFov");
+  const aVertexPosition: number = gl.getAttribLocation(
+    program,
+    'aVertexPosition'
+  );
+  const aTextureCoord: number = gl.getAttribLocation(program, 'aTextureCoord');
+  const uSampler: WebGLUniformLocation | null = gl.getUniformLocation(
+    program,
+    'uSampler'
+  );
+  const uLensS: WebGLUniformLocation | null = gl.getUniformLocation(
+    program,
+    'uLensS'
+  );
+  const uLensF: WebGLUniformLocation | null = gl.getUniformLocation(
+    program,
+    'uLensF'
+  );
+  const uFov: WebGLUniformLocation | null = gl.getUniformLocation(
+    program,
+    'uFov'
+  );
 
   const texture: WebGLTexture | null = gl.createTexture();
   if (!texture) {
-    throw new Error("texture is null");
+    throw new Error('texture is null');
   }
 
   let vertexBuffer: WebGLBuffer | null;
@@ -116,59 +121,76 @@ function FisheyeGl(options: Options): Fisheye {
   let textureBuffer: WebGLBuffer | null;
 
   function createBuffers() {
-
     vertexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(model.vertex), gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array(model.vertex),
+      gl.STATIC_DRAW
+    );
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
     indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(model.indices), gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ELEMENT_ARRAY_BUFFER,
+      new Uint16Array(model.indices),
+      gl.STATIC_DRAW
+    );
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
     textureBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(model.textureCoords), gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array(model.textureCoords),
+      gl.STATIC_DRAW
+    );
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
   }
 
   createBuffers();
 
   function getGLContext(selector: string): WebGLRenderingContext {
-    console.log("getGLContext");
-    const canvas: HTMLCanvasElement | null = options.canvas
+    const canvas: HTMLCanvasElement | null = options.canvas;
 
     if (!canvas) {
-      throw new Error("there is no canvas on this page");
+      throw new Error('there is no canvas on this page');
     }
 
     for (var i = 0; i < CONTEXT_TYPES.length; ++i) {
       let gl: WebGLRenderingContext | null;
       try {
-        gl = canvas.getContext(CONTEXT_TYPES[i], { preserveDrawingBuffer: true }) as WebGLRenderingContext;
+        gl = canvas.getContext(CONTEXT_TYPES[i], {
+          preserveDrawingBuffer: true
+        }) as WebGLRenderingContext;
       } catch (e) {
         continue;
       }
       if (gl) return gl;
     }
-    throw new Error("WebGL is not supported!");
+    throw new Error('WebGL is not supported!');
   }
 
-  function compileShader(gl: WebGLRenderingContext, vertexSrc: string, fragmentSrc: string): WebGLProgram {
+  function compileShader(
+    gl: WebGLRenderingContext,
+    vertexSrc: string,
+    fragmentSrc: string
+  ): WebGLProgram {
     const vertexShader: WebGLShader | null = gl.createShader(gl.VERTEX_SHADER);
     if (!vertexShader) {
-      throw new Error("vertexShader is null");
+      throw new Error('vertexShader is null');
     }
     gl.shaderSource(vertexShader, vertexSrc);
     gl.compileShader(vertexShader);
 
     _checkCompile(vertexShader);
 
-    const fragmentShader: WebGLShader | null = gl.createShader(gl.FRAGMENT_SHADER);
+    const fragmentShader: WebGLShader | null = gl.createShader(
+      gl.FRAGMENT_SHADER
+    );
     if (!fragmentShader) {
-      throw new Error("fragmentShader is null");
+      throw new Error('fragmentShader is null');
     }
     gl.shaderSource(fragmentShader, fragmentSrc);
     gl.compileShader(fragmentShader);
@@ -177,7 +199,7 @@ function FisheyeGl(options: Options): Fisheye {
 
     const program: WebGLProgram | null = gl.createProgram();
     if (!program) {
-      throw new Error("program is null");
+      throw new Error('program is null');
     }
 
     gl.attachShader(program, vertexShader);
@@ -190,12 +212,15 @@ function FisheyeGl(options: Options): Fisheye {
     function _checkCompile(shader: WebGLShader) {
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         const shaderLogInfo = gl.getShaderInfoLog(shader);
-        throw new Error(shaderLogInfo || "shader compile error");
+        throw new Error(shaderLogInfo || 'shader compile error');
       }
     }
   }
 
-  function loadFile(url: string, callback?: (error: Error | null, responseText?: string) => void): string {
+  function loadFile(
+    url: string,
+    callback?: (error: Error | null, responseText?: string) => void
+  ): string {
     if (shaders.hasOwnProperty(url)) {
       return shaders[url] as string;
     }
@@ -203,18 +228,18 @@ function FisheyeGl(options: Options): Fisheye {
     var ajax = new XMLHttpRequest();
 
     if (callback) {
-      ajax.addEventListener("readystatechange", on)
-      ajax.open("GET", url, true);
+      ajax.addEventListener('readystatechange', on);
+      ajax.open('GET', url, true);
       ajax.send(null);
     } else {
-      ajax.open("GET", url, false);
+      ajax.open('GET', url, false);
       ajax.send(null);
 
       if (ajax.status == 200) {
         return ajax.responseText;
       }
     }
-    return "";
+    return '';
 
     function on() {
       if (ajax.readyState === 4) {
@@ -223,14 +248,17 @@ function FisheyeGl(options: Options): Fisheye {
           //not error
           callback!(null, ajax.responseText);
         } else {
-          callback!(new Error("fail to load!"));
+          callback!(new Error('fail to load!'));
         }
       }
     }
   }
 
-  function loadImage(gl: WebGLRenderingContext, img: HTMLImageElement, callback?: (error: Error | null, texture: WebGLTexture) => void,): void {
-
+  function loadImage(
+    gl: WebGLRenderingContext,
+    img: HTMLImageElement,
+    callback?: (error: Error | null, texture: WebGLTexture) => void
+  ): void {
     gl.bindTexture(gl.TEXTURE_2D, texture);
 
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
@@ -245,17 +273,18 @@ function FisheyeGl(options: Options): Fisheye {
     if (callback) callback(null, texture!);
   }
 
-  function loadImageFromUrl(gl: WebGLRenderingContext, url: string, callback?: () => void): void {
+  function loadImageFromUrl(
+    gl: WebGLRenderingContext,
+    url: string,
+    callback?: () => void
+  ): void {
     const img: HTMLImageElement = new Image();
-    img.addEventListener("load", function onload() {
+    img.addEventListener('load', function onload() {
       if (img) {
         loadImage(gl, img, callback);
         options.width = img.width;
         options.height = img.height;
-        resize(
-          options.width,
-          options.height
-        )
+        resize(options.width, options.height);
       }
     });
     img.src = url;
@@ -264,8 +293,11 @@ function FisheyeGl(options: Options): Fisheye {
   function run(animate: boolean, callback?: () => void) {
     if (animate === true) {
       // Animation mode: use requestAnimationFrame loop
-      var f = window.requestAnimationFrame || (window as any).mozRequestAnimationFrame ||
-        (window as any).webkitRequestAnimationFrame || (window as any).msRequestAnimationFrame;
+      var f =
+        window.requestAnimationFrame ||
+        (window as any).mozRequestAnimationFrame ||
+        (window as any).webkitRequestAnimationFrame ||
+        (window as any).msRequestAnimationFrame;
 
       if (!f) {
         throw new Error("do not support 'requestAnimationFrame'");
@@ -295,41 +327,41 @@ function FisheyeGl(options: Options): Fisheye {
     gl.canvas.height = h;
   }
 
-  options.runner = options.runner || function runner(dt: number) {
-    // console.log('fisheyegl runner');
+  options.runner =
+    options.runner ||
+    function runner(dt: number) {
+      // console.log('fisheyegl runner');
 
-    gl.clearColor(0.5, 0.5, 0.5, 1.0);
-    gl.enable(gl.DEPTH_TEST);
+      gl.clearColor(0.5, 0.5, 0.5, 1.0);
+      gl.enable(gl.DEPTH_TEST);
 
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    gl.enableVertexAttribArray(aVertexPosition);
+      gl.enableVertexAttribArray(aVertexPosition);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.vertexAttribPointer(aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+      gl.vertexAttribPointer(aVertexPosition, 3, gl.FLOAT, false, 0, 0);
 
-    gl.enableVertexAttribArray(aTextureCoord);
+      gl.enableVertexAttribArray(aTextureCoord);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
-    gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+      gl.vertexAttribPointer(aTextureCoord, 2, gl.FLOAT, false, 0, 0);
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.uniform1i(uSampler, 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.uniform1i(uSampler, 0);
 
-    gl.uniform3fv(uLensS, [lens.a, lens.b, lens.scale]);
-    gl.uniform2fv(uLensF, [lens.Fx, lens.Fy]);
-    gl.uniform2fv(uFov, [fov.x, fov.y]);
+      gl.uniform3fv(uLensS, [lens.a, lens.b, lens.scale]);
+      gl.uniform2fv(uLensF, [lens.Fx, lens.Fy]);
+      gl.uniform2fv(uFov, [fov.x, fov.y]);
 
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    gl.drawElements(gl.TRIANGLES, model.indices.length, gl.UNSIGNED_SHORT, 0);
-  }
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      gl.drawElements(gl.TRIANGLES, model.indices.length, gl.UNSIGNED_SHORT, 0);
+    };
 
   function setImage(imageUrl: string, callback?: () => void) {
     loadImageFromUrl(gl, imageUrl, function onImageLoad() {
-
       run(options.animate!, callback);
-
     });
   }
 
@@ -340,7 +372,14 @@ function FisheyeGl(options: Options): Fisheye {
   function setCanvasSource(sourceCanvas: HTMLCanvasElement): void {
     // Bind and upload the canvas directly to the WebGL texture
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      sourceCanvas
+    );
 
     // Set texture parameters
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -362,15 +401,14 @@ function FisheyeGl(options: Options): Fisheye {
 
   // asynchronous!
   function getImage(format?: string): HTMLImageElement {
-
     var img = new Image();
 
-    img.src = (gl.canvas as HTMLCanvasElement).toDataURL(format || 'image/jpeg');
+    img.src = (gl.canvas as HTMLCanvasElement).toDataURL(
+      format || 'image/jpeg'
+    );
 
     return img;
-
   }
-
 
   // asynchronous!
   function getCanvasDataUrl(): string {
@@ -379,9 +417,8 @@ function FisheyeGl(options: Options): Fisheye {
 
   // asynchronous!
   function getCanvas(): HTMLCanvasElement {
-    return (gl.canvas as HTMLCanvasElement);
+    return gl.canvas as HTMLCanvasElement;
   }
-
 
   // external API:
   return {
@@ -394,15 +431,14 @@ function FisheyeGl(options: Options): Fisheye {
     setImage: setImage,
     setCanvasSource: setCanvasSource,
     getCanvasDataUrl: getCanvasDataUrl,
-    getCanvas: getCanvas,
-  }
-
+    getCanvas: getCanvas
+  };
 }
 
 // if (typeof (document) != 'undefined') {
 //   console.log('FisheyeGl loaded');
 //   window.FisheyeGl = FisheyeGl;
 // }
-export default FisheyeGl
+export default FisheyeGl;
 // else
 //   module.exports = FisheyeGl;
