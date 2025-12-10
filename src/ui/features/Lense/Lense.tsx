@@ -343,7 +343,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         patternOpacity={0.25}
         style={{ display: canvasesVisible ? 'block' : 'none' }}
       />
-      l
       {canvasesVisible && (
         <ControlDrawer
           canvasSize={CANVAS_SIZE}
