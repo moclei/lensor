@@ -9,3 +9,9 @@ scratch/
 
 # AI assistant prompts
 .prompts/
+
+# Private developer credentials and account info
+.developer/
+
+# Release artifacts
+lensor-release.zip
