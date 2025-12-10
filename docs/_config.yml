@@ -1,0 +1,12 @@
+# GitHub Pages configuration for Lensor
+title: Lensor
+description: A magnifying lens for pixel-perfect color detection
+theme: minima
+baseurl: "/lensor"
+url: "https://moclei.github.io"
+
+# Exclude build files from Jekyll
+exclude:
+  - store-listing.md
+  - developer-account.md
+

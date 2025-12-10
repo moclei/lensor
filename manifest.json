@@ -1,17 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Lensor",
-  "version": "1.44.1680",
-  "description": "A lense for viewing your pixels",
+  "version": "1.0.0",
+  "description": "A magnifying lens for pixel-perfect color detection and palette generation",
   "permissions": [
     "tabCapture",
     "tabs",
     "storage",
     "scripting",
-    "favicon",
-    "contextMenus",
-    "sidePanel",
-    "scripting"
+    "sidePanel"
   ],
   "host_permissions": [
     "*://*/*"
@@ -32,16 +29,6 @@
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"
   },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "test2.png"
-      ],
-      "matches": [
-        "*://*/*"
-      ]
-    }
-  ],
   "icons": {
     "16": "images/lensor-icon-16.png",
     "48": "images/lensor-icon-48.png",

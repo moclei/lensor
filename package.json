@@ -11,8 +11,10 @@
     "build": "NODE_ENV=production node ./build.mjs",
     "build:dev": "NODE_ENV=development node ./build.mjs",
     "watch": "NODE_ENV=development node ./build.mjs --watch",
+    "release": "node ./build.release.mjs",
     "type-check": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "zip": "cd dist && zip -r ../lensor-release.zip . && cd .."
   },
   "keywords": [
     "web-extensions",
