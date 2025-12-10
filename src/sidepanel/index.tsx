@@ -3,6 +3,9 @@ import { StyleSheetManager } from 'styled-components';
 import React from 'react';
 import './index.css';
 import App from './App';
+import { debug } from '../lib/debug';
+
+const log = debug.ui;
 
 const styles = {
   container: {
@@ -16,7 +19,7 @@ const styles = {
   }
 };
 
-console.log('Sidepanel: Lensor sidepanel container created');
+log('Sidepanel script loaded');
 
 document.addEventListener('DOMContentLoaded', function () {
   initializeReactApp();
@@ -24,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function initializeReactApp() {
   if (self === top) {
-    console.log('Sidepanel: initializeShadowRoot()');
+    log('Initializing sidepanel React app');
     const appContainer = document.createElement('div');
     document.body.appendChild(appContainer);
     setStylesOnElement(appContainer, styles.container.shadow);

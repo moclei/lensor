@@ -5,8 +5,11 @@ import './index.css';
 import Lense from './features/Lense/Lense';
 import { connect } from 'crann';
 import { LensorStateConfig } from './state-config';
+import { debug } from '../lib/debug';
 
-console.log('Injected Lensor UI mounted');
+const log = debug.ui;
+
+log('Lensor UI script loaded');
 
 const LENSOR_CONTAINER_ID = 'lensor-shadow-container';
 
@@ -44,7 +47,7 @@ type LensorState = {
 function getOrCreateContainer(): HTMLDivElement {
   const existing = document.getElementById(LENSOR_CONTAINER_ID) as HTMLDivElement | null;
   if (existing) {
-    console.log('[UI] Found existing container, removing it for fresh start');
+    log('Found existing container, removing for fresh start');
     existing.remove();
   }
   const container = document.createElement('div');
@@ -70,7 +73,7 @@ const [_active, _setActive, onActive] = useCrann('active');
 const [initialized, setInitialized] = useCrann('initialized');
 
 onReady(() => {
-  console.log('[UI] onReady()');
+  log('Crann ready');
   if (!initialized) {
     initializeReact();
     setInitialized(true);
@@ -78,19 +81,15 @@ onReady(() => {
 });
 
 onActive((update) => {
-  console.log('onActive, active: ', { update });
+  log('Active state changed: %o', update);
   if (self === top && state.shadowRoot && update.current !== update.previous) {
-    console.log('onActive, toggling shadow root visibility: ', { update });
-    // if (!initialized) {
-    //   initializeReact();
-    // }
     toggleShadowRootVisibility(update.current);
   }
 });
 
 const toggleShadowRootVisibility = (visible: boolean) => {
   if (self !== top || !state.shadowContainer) return;
-  console.log('toggleShadowRootVisibility()');
+  log('Setting visibility: %s', visible);
   let newStyle: Partial<CSSStyleDeclaration> = styles.container.shadow;
   if (!visible) {
     newStyle = { ...newStyle, ...styles.container.invisible };
@@ -99,13 +98,13 @@ const toggleShadowRootVisibility = (visible: boolean) => {
 };
 
 function initializeReact() {
-  console.log('[UI] initializeReact()');
+  log('Initializing React');
   const { shadowContainer } = state;
   let { shadowRoot } = state;
 
   // If shadow root already exists, don't recreate it
   if (shadowRoot) {
-    console.log('[UI] initializeReact() shadowRoot already exists');
+    log('Shadow root already exists, skipping');
     return;
   }
 
@@ -125,7 +124,7 @@ function initializeReact() {
 
   shadowRoot.appendChild(uiRoot);
 
-  console.log('[UI] initializeReact() creating root');
+  log('Creating React root');
   if (styleSlot) {
     const root = createRoot(uiRoot);
     root.render(
@@ -137,11 +136,11 @@ function initializeReact() {
 }
 
 function handleLensorStop() {
-  console.log('Handle lensor stop');
+  log('Stop requested');
 }
 
 function handleLensorClose() {
-  console.log('Handle lensor close');
+  log('Close requested');
 }
 
 function setStylesOnElement(

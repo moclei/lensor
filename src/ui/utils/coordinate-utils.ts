@@ -10,12 +10,6 @@ export const calculateCaptureRegion = (
 ) => {
   const { scale, effectiveZoom, canvasSize } = options;
   const captureSize = canvasSize / effectiveZoom;
-  console.log('calculateCaptureRegion, captureSize', {
-    scale,
-    effectiveZoom,
-    canvasSize,
-    captureSize
-  });
   return {
     x: center.x * scale - captureSize / 2,
     y: center.y * scale - captureSize / 2,

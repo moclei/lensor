@@ -1,4 +1,5 @@
+import { debug } from '../lib/debug';
 
+const log = debug.ui;
 
-console.log('ContentScript loaded!');
-
+log('Content script loaded');

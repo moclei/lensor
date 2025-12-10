@@ -27,6 +27,9 @@ import {
 } from '@/ui/utils/color-utils';
 import Handle from './Handle';
 import ControlDrawer, { DrawerPosition } from './ControlDrawer';
+import { debug } from '../../../lib/debug';
+
+const log = debug.ui;
 
 const CANVAS_SIZE = 400;
 const DRAWER_HEIGHT = 326; // Pull tab (26px) + Panel (300px)
@@ -72,7 +75,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const [zoom, setZoom] = useStateItem('zoom');
   const [active] = useStateItem('active');
 
-  console.log('[Lense] active state:', active);
+  log('Render, active: %s', active);
 
   const { debugMode } = useDebugMode();
   const { debugInfo, setDebugInfo } = useDebugInfo();
@@ -83,12 +86,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     captureFrame,
     error
   } = useMediaCapture();
-
-  console.log('[Lense] Media capture state:', {
-    hasImage: !!currentImage,
-    isCapturing,
-    hasError: !!error
-  });
 
   const {
     canvasesVisible,
@@ -104,31 +101,18 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     mainCanvasRef,
     active,
     onInitialize: () => {
-      console.log('[Lense] Canvas initialization callback executed');
       if (gridOn) drawGrid();
       drawCrosshairs();
     },
     onDrawComplete: (canvasCenter) => {
-      console.log(
-        '[Lense] Canvas draw complete callback, center:',
-        canvasCenter
-      );
+      log('Canvas draw complete, center: %o', canvasCenter);
     }
-  });
-
-  console.log('[Lense] Canvas lifecycle state:', {
-    canvasesVisible,
-    initialized,
-    canvasesReady,
-    initialDrawComplete
   });
 
   const { lastChangeTimestamp, lastScrollPosition } = usePageObservers(
     () => {
       if (active && !isCapturing) {
-        console.log(
-          '[Lense] Page observer detected change, calling captureFrame'
-        );
+        log('Page change detected, recapturing');
         captureFrame();
       }
     },
@@ -177,16 +161,8 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   );
 
   useEffect(() => {
-    console.log('[Lense] Canvas update effect triggered:', {
-      canvasesReady,
-      hasCurrentImage: !!currentImage,
-      hasMainCanvas: !!mainCanvasRef.current
-    });
-
     if (canvasesReady && currentImage && mainCanvasRef.current) {
-      console.log('[Lense] Updating canvas and detecting color');
       const updatedColor = updateCanvas();
-      console.log('[Lense] updateCanvas result:', updatedColor);
 
       const detectedColor = detectPixelColor(mainCanvasRef);
       if (updatedColor) {
@@ -282,7 +258,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   }, [calculateDrawerPosition, mousePos]);
 
   useEffect(() => {
-    console.log('[Lense] Grid effect triggered');
     drawGrid();
     drawCrosshairs({ color: gridContrastColor });
   }, [gridOn, scale, zoom, drawGrid, drawCrosshairs, gridContrastColor]);

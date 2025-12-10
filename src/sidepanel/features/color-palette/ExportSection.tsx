@@ -53,7 +53,7 @@ interface ExportSectionProps {}
 
 const ExportSection: React.FC<ExportSectionProps> = () => {
   const handleExportStub = (format: string) => {
-    console.log(`Export ${format} - Coming soon!`);
+    // Export functionality coming soon
   };
 
   return (

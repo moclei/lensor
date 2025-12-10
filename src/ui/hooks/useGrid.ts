@@ -1,4 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { debug } from '../../lib/debug';
+
+const log = debug.grid;
 
 interface UseGridDrawingProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
@@ -34,13 +37,14 @@ export function useGrid({
       if (!ctx) return;
 
       // Clear previous grid
-      console.log('[useGrid] Clearing previous grid');
       ctx.clearRect(0, 0, canvasSize, canvasSize);
 
       if (!isGridVisible) {
         setIsGridDrawn(false);
         return;
       }
+
+      log('Drawing grid');
 
       const cssPixelsToShow = canvasSize / zoom;
       const cssPixelSizeOnCanvas = canvasSize / cssPixelsToShow;

@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLensorState } from './useLensorState';
+import { debug } from '../../lib/debug';
+
+const log = debug.capture;
 
 // Types
 type BorderCropProps = {
@@ -23,8 +26,6 @@ interface UseMediaCaptureResult {
 export function useMediaCapture(
   options: UseMediaCaptureOptions = {}
 ): UseMediaCaptureResult {
-  console.log('[useMediaCapture] Hook called');
-
   const { useStateItem, callAction } = useLensorState();
   const { autoCapture = true } = options;
 
@@ -37,90 +38,65 @@ export function useMediaCapture(
 
   const [active] = useStateItem('active');
 
-  console.log('[useMediaCapture] Defining fetchMediaStreamId');
   const fetchMediaStreamId = async () => {
-    console.log('[useMediaCapture] calling fetchMediaStreamId');
+    log('Fetching media stream ID');
     const mediaStreamId = await callAction('getMediaStreamId');
-    console.log('[useMediaCapture] Media stream id:', mediaStreamId);
+    log('Received stream ID: %s', mediaStreamId);
     setupMediaCapture(mediaStreamId);
   };
 
   useEffect(() => {
     if (active) {
-      console.log(
-        '[useMediaCapture] active is true, calling fetchMediaStreamId'
-      );
       fetchMediaStreamId();
     }
   }, [active]);
 
   // Clean up function
   const cleanupMediaCapture = useCallback(() => {
-    console.log('[useMediaCapture] Cleaning up media capture');
+    log('Cleaning up media capture');
     if (mediaStreamRef.current) {
       try {
         mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-        console.log('[useMediaCapture] Media stream tracks stopped');
       } catch (e) {
-        console.error(
-          '[useMediaCapture] Error stopping media stream tracks:',
-          e
-        );
+        console.error('[useMediaCapture] Error stopping media stream tracks:', e);
       }
       mediaStreamRef.current = null;
     }
 
     if (activeImageCaptureRef.current) {
       activeImageCaptureRef.current = null;
-      console.log('[useMediaCapture] Image capture reference cleared');
     }
   }, []);
 
   // Setup media capture
   const setupMediaCapture = useCallback(
     async (streamId: string) => {
-      console.log(
-        '[useMediaCapture] Setting up media capture with streamId:',
-        streamId
-      );
+      log('Setting up media capture');
       setIsCapturing(true);
       setError(null);
 
       try {
-        // Clean up any existing capture
         cleanupMediaCapture();
 
-        // Create a new media stream
-        console.log('[useMediaCapture] Creating media stream');
         const media = await createMediaStream(streamId);
 
         if (!media) {
           throw new Error('Failed to create media stream');
         }
 
-        console.log('[useMediaCapture] Media stream created successfully');
+        log('Media stream created successfully');
         mediaStreamRef.current = media;
-
-        // Create and store the ImageCapture instance
-        console.log('[useMediaCapture] Creating ImageCapture instance');
         activeImageCaptureRef.current = new ImageCapture(
           media.getVideoTracks()[0]
         );
 
-        // Auto-capture if enabled
         if (autoCapture) {
-          console.log(
-            '[useMediaCapture] Auto-capture enabled, capturing frame'
-          );
           await captureFrame();
         } else {
           setIsCapturing(false);
         }
       } catch (error) {
-        console.error(
-          '[useMediaCapture] Error setting up media capture:',
-          error
-        );
+        console.error('[useMediaCapture] Error setting up media capture:', error);
         setError(
           error instanceof Error
             ? error
@@ -134,7 +110,6 @@ export function useMediaCapture(
 
   // Capture a frame
   const captureFrame = useCallback(async () => {
-    console.log('[useMediaCapture] captureFrame called');
     if (!activeImageCaptureRef.current) {
       console.error('[useMediaCapture] No active image capture available');
       setError(new Error('No active image capture available'));
@@ -157,22 +132,13 @@ export function useMediaCapture(
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     try {
-      console.log('[useMediaCapture] Grabbing frame (after hide delay)');
       const rawBitmap = await activeImageCaptureRef.current.grabFrame();
-      console.log('[useMediaCapture] Frame grabbed successfully');
+      log('Frame captured');
 
-      // Process the image (crop borders if needed)
       const cropMetrics = calculateImageBlackBorder(rawBitmap);
-      console.log('[useMediaCapture] Calculated crop metrics:', cropMetrics);
-
-      const processedBitmap = await cropImageBlackBorder(
-        rawBitmap,
-        cropMetrics
-      );
-      console.log('[useMediaCapture] Image processed, setting bitmap');
+      const processedBitmap = await cropImageBlackBorder(rawBitmap, cropMetrics);
 
       setImageBitmap(processedBitmap);
-      console.log('[useMediaCapture] imageBitmap state updated');
     } catch (error) {
       console.error('[useMediaCapture] Error capturing frame:', error);
       setError(
@@ -187,20 +153,13 @@ export function useMediaCapture(
 
   // Effect to handle changes to the media stream ID or active state
   useEffect(() => {
-    console.log('[useMediaCapture] Media stream or active state changed:', {
-      mediaStreamRef: mediaStreamRef.current,
-      active,
-      hasImageBitmap: !!imageBitmap
-    });
     if (mediaStreamRef.current && !active) {
-      console.log('[useMediaCapture] Active is false, cleaning up');
+      log('Active is false, cleaning up');
       cleanupMediaCapture();
-      console.log('[useMediaCapture] Clearing imageBitmap');
       setImageBitmap(null);
     }
 
     return () => {
-      console.log('[useMediaCapture] Effect cleanup running');
       cleanupMediaCapture();
     };
   }, [mediaStreamRef, active, setupMediaCapture, cleanupMediaCapture]);
@@ -218,10 +177,6 @@ async function createMediaStream(
   streamId: string
 ): Promise<MediaStream | null> {
   try {
-    console.log(
-      '[useMediaCapture] Getting user media with streamId:',
-      streamId
-    );
     const media = await (navigator.mediaDevices as any).getUserMedia({
       video: {
         mandatory: {
@@ -230,7 +185,7 @@ async function createMediaStream(
         }
       }
     });
-    console.log('[useMediaCapture] Media stream obtained successfully');
+    log('Media stream obtained');
     return media;
   } catch (error) {
     console.error('[useMediaCapture] Error starting recording:', error);
@@ -292,13 +247,6 @@ async function cropImageBlackBorder(
   const newWidth =
     originalWidth - cropMetrics.estimatedLeftRightBorderWidth * 2;
 
-  console.log('[useMediaCapture] Cropping image border:', {
-    originalWidth,
-    originalHeight,
-    newWidth,
-    newHeight
-  });
-
   // Create a new ImageBitmap with the cropped dimensions
   const croppedBitmap = await createImageBitmap(
     sourceBitmap,
@@ -314,7 +262,6 @@ async function cropImageBlackBorder(
   );
 
   sourceBitmap.close();
-  console.log('[useMediaCapture] Image cropped successfully');
 
   return croppedBitmap;
 }

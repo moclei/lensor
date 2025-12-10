@@ -31,7 +31,6 @@ const Home: React.FC<HomeProps> = () => {
   const [hoveredColor] = useStateItem('hoveredColor');
 
   const handleChange = (setting: string) => {
-    console.log('handleChange, setting: ', setting);
     if (setting === 'grid') {
       setIsGridShown(!isGridShown);
     } else if (setting === 'fisheye') {
