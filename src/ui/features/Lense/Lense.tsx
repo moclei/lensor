@@ -19,6 +19,7 @@ import { useDebugInfo, useDebugMode } from '@/ui/utils/debug-utils';
 import { useMediaCapture } from '@/ui/hooks/useMediaCapture';
 import { usePageObservers } from '@/ui/hooks/usePageObserver';
 import { useCanvasLifecycle } from '@/ui/hooks/useCanvasLifecycle';
+import { useInactivityTimeout } from '@/ui/hooks/useInactivityTimeout';
 import {
   convertToGrayscalePreservingFormat,
   hexToRgba,
@@ -37,8 +38,21 @@ const DRAWER_WIDTH = 260;
 const DRAWER_MARGIN = 10; // Small buffer from viewport edges
 const DRAWER_HALF_HEIGHT = DRAWER_HEIGHT / 2; // For vertical centering check on side positions
 
+// Inactivity timeout duration (20 minutes)
+const INACTIVITY_TIMEOUT_MS = 1 * 60 * 1000;
+
 // Module-level state for drawer - persists across component remounts during capture
 let persistedDrawerOpen = false;
+
+// Get the shutdown function from the global scope (set by ui/index.tsx)
+const shutdownLensor = (): void => {
+  const shutdown = (window as any).__lensorShutdown;
+  if (typeof shutdown === 'function') {
+    shutdown();
+  } else {
+    log('Shutdown function not available');
+  }
+};
 
 interface LenseProps {
   onStop: () => void;
@@ -80,6 +94,13 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const { debugMode } = useDebugMode();
   const { debugInfo, setDebugInfo } = useDebugInfo();
 
+  // Inactivity timeout - shuts down extension after period of no activity
+  const { resetActivity } = useInactivityTimeout({
+    timeoutMs: INACTIVITY_TIMEOUT_MS,
+    onTimeout: shutdownLensor,
+    enabled: active
+  });
+
   const {
     imageBitmap: currentImage,
     isCapturing,
@@ -114,6 +135,8 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
       if (active && !isCapturing) {
         log('Page change detected, recapturing');
         captureFrame();
+        // Reset inactivity timer on page interaction (scroll, resize, DOM changes)
+        resetActivity();
       }
     },
     {
@@ -148,6 +171,8 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     dragHandleRef: ringHandleRef,
     updateCanvas: (coords: { x: number; y: number }) => {
       setMousePos({ x: coords.x, y: coords.y });
+      // Reset inactivity timer on drag
+      resetActivity();
     },
     initialPosition: lensePosition,
     onDragEnd: setLensePosition,
@@ -180,24 +205,28 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     zoom
   ]);
 
-  // Control drawer callbacks
+  // Control drawer callbacks - all reset inactivity timer
   const handleDrawerToggle = useCallback(() => {
     setDrawerOpen(!drawerOpen);
-  }, [drawerOpen, setDrawerOpen]);
+    resetActivity();
+  }, [drawerOpen, setDrawerOpen, resetActivity]);
 
   const handleGridToggle = useCallback(() => {
     setGridOn(!gridOn);
-  }, [gridOn, setGridOn]);
+    resetActivity();
+  }, [gridOn, setGridOn, resetActivity]);
 
   const handleFisheyeToggle = useCallback(() => {
     setFisheyeOn(!fisheyeOn);
-  }, [fisheyeOn, setFisheyeOn]);
+    resetActivity();
+  }, [fisheyeOn, setFisheyeOn, resetActivity]);
 
   const handleZoomChange = useCallback(
     (newZoom: number) => {
       setZoom(newZoom);
+      resetActivity();
     },
-    [setZoom]
+    [setZoom, resetActivity]
   );
 
   // Calculate optimal drawer position based on available viewport space

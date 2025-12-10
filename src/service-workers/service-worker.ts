@@ -6,13 +6,16 @@ import { debug } from '../lib/debug';
 
 const log = debug.sw;
 
-log('Service worker created, version: %s', chrome.runtime.getManifest().version);
+log(
+  'Service worker created, version: %s',
+  chrome.runtime.getManifest().version
+);
 
 // Set up state with crann
 const { get, set, subscribe, queryAgents, onInstanceReady } = create(
   LensorStateConfig,
   {
-    debug: true
+    debug: false
   }
 );
 
@@ -29,7 +32,10 @@ async function handleActionButtonClick(tab: chrome.tabs.Tab) {
     set({ active: !isActive }, key);
   }
   if (!key || !state) {
-    console.warn('[SW] Action button clicked but no agent found for tab', { key, state });
+    console.warn('[SW] Action button clicked but no agent found for tab', {
+      key,
+      state
+    });
     await injectContentScript(tab.id);
   }
 }

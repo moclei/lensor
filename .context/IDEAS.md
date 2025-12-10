@@ -10,7 +10,7 @@ Issues that need resolution before Chrome Web Store release:
 - [ ] **Position resets on recapture** — Preserve lens position across recaptures
 - [ ] **Manual refresh option** — Button to manually trigger recapture
 - [ ] **Disable auto-recapture option** — Setting to turn off automatic recapturing
-- [ ] **Screen sharing indicator** — Close MediaStream after each capture to remove Chrome's recording icon
+- [x] **Screen sharing indicator** — ~~Close MediaStream after each capture~~ Mitigated via inactivity timeout (20min) that stops capture and hides UI. User can restart by clicking extension icon.
 - [ ] **Sidepanel styling** — Polish the control panel UI
 - [ ] **Version numbering** — Switch from auto-increment to semantic versioning
 
@@ -32,6 +32,7 @@ Issues that need resolution before Chrome Web Store release:
 - [ ] **Lens size presets** — Small/medium/large quick toggles
 - [ ] **Keyboard shortcuts** — Move lens with arrow keys, toggle with hotkey
 - [ ] **Smart contrast** — Auto-adjust grid/handle colors based on background
+- [ ] **Auto-restart on tab focus** — When extension auto-shuts down due to inactivity, automatically restart when user returns to tab (instead of requiring icon click)
 
 ### Export & Sharing
 
@@ -66,6 +67,8 @@ Issues that need resolution before Chrome Web Store release:
 - [ ] **Dark/light sidepanel theme** — Match system preference
 - [ ] **Compact mode** — Minimal UI for power users
 - [ ] **Lens cursor customization** — Custom cursor when hovering lens
+- [ ] **Configurable inactivity timeout** — Setting to adjust the 20-minute auto-shutdown timer
+- [ ] **Timeout warning** — Show visual warning before auto-shutdown (e.g., "Shutting down in 1 minute...")
 
 ## Long-term Possibilities
 

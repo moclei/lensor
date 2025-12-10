@@ -39,6 +39,21 @@ Lensor operates across three independent JavaScript execution contexts, synchron
 6. Lense canvas draws zoomed portion based on lens position
 7. Page observers trigger recapture on scroll/resize/DOM mutations
 
+### Inactivity Timeout Flow
+
+To address the persistent screen recording indicator, the extension auto-shuts down after inactivity:
+
+1. `useInactivityTimeout` hook starts a 20-minute timer when extension activates
+2. Timer resets on user activity (drag lens, toggle controls, zoom, scroll page)
+3. Timer also resets when tab becomes visible again (user returns to tab)
+4. When timer expires:
+   - `active` state is set to `false`
+   - `useMediaCapture` cleanup runs, calling `track.stop()` on MediaStream
+   - Chrome's recording indicator disappears
+   - UI becomes hidden
+   - Sidepanel closes
+5. User can restart by clicking the extension icon (existing flow handles this)
+
 ### State Management (Crann)
 
 State items have two partition types:
@@ -68,6 +83,7 @@ Key state items:
 - **Color Detection**: Detects RGB color at lens center
 - **Color Palettes**: Generates monochromatic and Material Design palettes from detected color
 - **Auto-Recapture**: Re-captures page on scroll, resize, or significant DOM changes
+- **Inactivity Timeout**: Automatically shuts down after 20 minutes of inactivity to stop screen capture
 
 ### Visual Options
 
@@ -103,6 +119,7 @@ src/
 │   │   ├── useColorDetection.ts  # Color picking & palette generation
 │   │   ├── useGrid.ts            # Grid overlay drawing
 │   │   ├── usePageObserver.ts    # Scroll/resize/mutation detection
+│   │   ├── useInactivityTimeout.ts # Auto-shutdown after inactivity
 │   │   └── useLensorState.ts     # Crann hook wrapper
 │   └── utils/               # Color, coordinate, debug utilities
 ├── sidepanel/               # Chrome sidepanel React app
@@ -185,7 +202,7 @@ Implementing color palette generation from the detected pixel color:
 ## Known Considerations
 
 - **Version number**: Currently auto-increments on every build (dev convenience). Needs manual versioning for release.
-- **Screen sharing indicator**: Chrome shows recording icon while `MediaStream` is active. Consider closing stream after each capture.
+- **Screen sharing indicator**: Chrome shows recording icon while `MediaStream` is active. Mitigated by the inactivity timeout feature which stops the stream after 20 minutes of no user interaction. User can restart by clicking the extension icon.
 - **Recapture timing**: May capture the lens itself if not hidden. Position may reset during recapture.
 
 ## Ignored Directories

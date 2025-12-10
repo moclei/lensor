@@ -45,7 +45,9 @@ type LensorState = {
 
 // Check if we already have a container in the DOM (from a previous injection)
 function getOrCreateContainer(): HTMLDivElement {
-  const existing = document.getElementById(LENSOR_CONTAINER_ID) as HTMLDivElement | null;
+  const existing = document.getElementById(
+    LENSOR_CONTAINER_ID
+  ) as HTMLDivElement | null;
   if (existing) {
     log('Found existing container, removing for fresh start');
     existing.remove();
@@ -66,11 +68,36 @@ const state: LensorState = {
 };
 
 const crann = connect(LensorStateConfig, {
-  debug: true
+  debug: false
 });
 const { useCrann, onReady } = crann;
-const [_active, _setActive, onActive] = useCrann('active');
+const [_active, setActive, onActive] = useCrann('active');
 const [initialized, setInitialized] = useCrann('initialized');
+const [_isSidepanelShown, setIsSidepanelShown] = useCrann('isSidepanelShown');
+
+/**
+ * Gracefully shut down the extension.
+ * This stops the screen capture (removing the recording indicator),
+ * hides the UI, and closes the sidepanel.
+ *
+ * The extension can be restarted by clicking the extension icon again.
+ */
+function shutdownLensor() {
+  log('Shutting down Lensor due to inactivity');
+  console.log('[Lensor] Shutting down due to inactivity...');
+
+  // Set active to false - this triggers MediaStream cleanup in useMediaCapture
+  setActive(false);
+
+  // Close the sidepanel
+  setIsSidepanelShown(false);
+
+  // The visibility toggle will happen automatically via onActive subscription
+  console.log('[Lensor] Shutdown complete - click extension icon to restart');
+}
+
+// Export for use by Lense component
+(window as any).__lensorShutdown = shutdownLensor;
 
 onReady(() => {
   log('Crann ready');
@@ -90,6 +117,7 @@ onActive((update) => {
 const toggleShadowRootVisibility = (visible: boolean) => {
   if (self !== top || !state.shadowContainer) return;
   log('Setting visibility: %s', visible);
+  console.log('[Lensor] Setting UI visibility:', visible);
   let newStyle: Partial<CSSStyleDeclaration> = styles.container.shadow;
   if (!visible) {
     newStyle = { ...newStyle, ...styles.container.invisible };
