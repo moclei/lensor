@@ -370,6 +370,53 @@ export function getTextColorForBackground(bgColor: string): string {
   return luminance > 128 ? '#000000' : '#ffffff';
 }
 
+// Get texture colors for knurling effect - lighter and darker variants
+// Used for embossed/knurling effects where we want visible but not stark contrast
+export function getSubtleTextureColor(
+  baseColor: string,
+  highlightIntensity: number = 5,
+  shadowIntensity: number = 25
+): { highlight: string; highlightBright: string; highlightBrightest: string; shadow: string } {
+  // Try to parse as hex first, then as rgb
+  let rgb = hexToRgb(baseColor);
+  
+  if (!rgb) {
+    // Try parsing as rgb/rgba string
+    const rgbMatch = baseColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (rgbMatch) {
+      rgb = {
+        r: parseInt(rgbMatch[1], 10),
+        g: parseInt(rgbMatch[2], 10),
+        b: parseInt(rgbMatch[3], 10)
+      };
+    }
+  }
+  
+  if (!rgb) {
+    return { highlight: '#ffffff', highlightBright: '#ffffff', highlightBrightest: '#ffffff', shadow: '#000000' };
+  }
+
+  const [h, s, l] = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  
+  // Create highlight variants (progressively lighter)
+  const highlight = rgbToHex(
+    ...hslToRgb(h, Math.max(s - 10, 0), Math.min(l + highlightIntensity, 100))
+  );
+  const highlightBright = rgbToHex(
+    ...hslToRgb(h, Math.max(s - 15, 0), Math.min(l + highlightIntensity + 12, 100))
+  );
+  const highlightBrightest = rgbToHex(
+    ...hslToRgb(h, Math.max(s - 20, 0), Math.min(l + highlightIntensity + 20, 100))
+  );
+  
+  // Create shadow (darker)
+  const shadow = rgbToHex(
+    ...hslToRgb(h, Math.max(s - 10, 0), Math.max(l - shadowIntensity, 0))
+  );
+  
+  return { highlight, highlightBright, highlightBrightest, shadow };
+}
+
 // Enhanced color palette generator with variants
 export function generateEnhancedPalette(baseColor: string): {
   main: string;

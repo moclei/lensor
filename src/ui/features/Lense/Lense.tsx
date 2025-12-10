@@ -9,7 +9,8 @@ import {
   GridCanvas,
   HiddenCanvas,
   LenseContainer,
-  MainCanvas
+  MainCanvas,
+  GlassOverlay
 } from './Lense.styles';
 import { useLenseCanvasUpdate } from '@/ui/hooks/useLenseCanvasUpdate';
 import { useGrid } from '@/ui/hooks/useGrid';
@@ -20,7 +21,8 @@ import { usePageObservers } from '@/ui/hooks/usePageObserver';
 import { useCanvasLifecycle } from '@/ui/hooks/useCanvasLifecycle';
 import {
   convertToGrayscalePreservingFormat,
-  hexToRgba
+  hexToRgba,
+  getSubtleTextureColor
 } from '@/ui/utils/color-utils';
 import Handle from './Handle';
 import ControlDrawer, { DrawerPosition } from './ControlDrawer';
@@ -49,7 +51,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const infoScrollRef = useRef<HTMLDivElement>(null);
 
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  
+
   // Drawer state - uses module-level variable to persist through capture cycles
   const [drawerOpen, setDrawerOpenState] = useState(persistedDrawerOpen);
   const setDrawerOpen = useCallback((value: boolean) => {
@@ -211,50 +213,59 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     setFisheyeOn(!fisheyeOn);
   }, [fisheyeOn, setFisheyeOn]);
 
-  const handleZoomChange = useCallback((newZoom: number) => {
-    setZoom(newZoom);
-  }, [setZoom]);
+  const handleZoomChange = useCallback(
+    (newZoom: number) => {
+      setZoom(newZoom);
+    },
+    [setZoom]
+  );
 
   // Calculate optimal drawer position based on available viewport space
   const calculateDrawerPosition = useCallback((): DrawerPosition => {
     if (!containerRef.current) return 'bottom';
-    
+
     const containerRect = containerRef.current.getBoundingClientRect();
-    
+
     // Available space in each direction from the canvas edge
     const spaceBottom = window.innerHeight - containerRect.bottom;
     const spaceRight = window.innerWidth - containerRect.right;
     const spaceLeft = containerRect.left;
     const spaceTop = containerRect.top;
-    
+
     // For right/left positions, the drawer is vertically centered on the lens.
     // We need to check if there's enough vertical space for the centered drawer.
     // The lens center is at containerRect.top + CANVAS_SIZE/2
     const lensCenterY = containerRect.top + CANVAS_SIZE / 2;
     const spaceAboveCenter = lensCenterY; // space from viewport top to lens center
     const spaceBelowCenter = window.innerHeight - lensCenterY; // space from lens center to viewport bottom
-    
+
     // For side positions (right/left), we need both:
     // - Enough horizontal space for the drawer width
     // - Enough vertical space above AND below the lens center for half the drawer height
-    const canFitVerticallyWhenCentered = 
+    const canFitVerticallyWhenCentered =
       spaceAboveCenter >= DRAWER_HALF_HEIGHT + DRAWER_MARGIN &&
       spaceBelowCenter >= DRAWER_HALF_HEIGHT + DRAWER_MARGIN;
-    
+
     // Check in priority order: bottom → right → left → top
     if (spaceBottom >= DRAWER_HEIGHT + DRAWER_MARGIN) {
       return 'bottom';
     }
-    if (spaceRight >= DRAWER_WIDTH + DRAWER_MARGIN && canFitVerticallyWhenCentered) {
+    if (
+      spaceRight >= DRAWER_WIDTH + DRAWER_MARGIN &&
+      canFitVerticallyWhenCentered
+    ) {
       return 'right';
     }
-    if (spaceLeft >= DRAWER_WIDTH + DRAWER_MARGIN && canFitVerticallyWhenCentered) {
+    if (
+      spaceLeft >= DRAWER_WIDTH + DRAWER_MARGIN &&
+      canFitVerticallyWhenCentered
+    ) {
       return 'left';
     }
     if (spaceTop >= DRAWER_HEIGHT + DRAWER_MARGIN) {
       return 'top';
     }
-    
+
     // Fallback to bottom if no space is sufficient
     return 'bottom';
   }, []);
@@ -293,6 +304,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         visible={canvasesVisible}
         shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
       />
+      <GlassOverlay visible={canvasesVisible} />
       <HiddenCanvas
         ref={fisheyeCanvasRef}
         id="lensor-fisheye-canvas"
@@ -319,9 +331,19 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         )}
         contrastColor2={colorPalette[1]}
         hoveredColor={hoveredColor}
-        patternName="diagonal"
+        textureHighlight={getSubtleTextureColor(hoveredColor, 5, 25).highlight}
+        textureHighlightBright={
+          getSubtleTextureColor(hoveredColor, 5, 25).highlightBright
+        }
+        textureHighlightBrightest={
+          getSubtleTextureColor(hoveredColor, 5, 25).highlightBrightest
+        }
+        textureShadow={getSubtleTextureColor(hoveredColor, 5, 25).shadow}
+        patternName="knurling"
+        patternOpacity={0.25}
         style={{ display: canvasesVisible ? 'block' : 'none' }}
       />
+      l
       {canvasesVisible && (
         <ControlDrawer
           canvasSize={CANVAS_SIZE}
