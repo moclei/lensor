@@ -12,21 +12,22 @@ Lensor creates a circular "lens" UI element that floats over web pages. Users ca
 
 ## Architecture
 
-Lensor operates across three independent JavaScript execution contexts, synchronized via **Crann** (a custom state management library):
+Lensor operates across two independent JavaScript execution contexts, synchronized via **Crann** (a custom state management library):
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Chrome Extension                           │
-├─────────────────┬─────────────────────┬─────────────────────────┤
-│  Service Worker │   Content Script    │       Sidepanel         │
-│  (Background)   │   (Per-Tab UI)      │   (Controls Panel)      │
-├─────────────────┼─────────────────────┼─────────────────────────┤
-│ • Extension APIs│ • Shadow DOM host   │ • React app             │
-│ • tabCapture    │ • React Lense app   │ • Settings/toggles      │
-│ • State hub     │ • Canvas rendering  │ • Color display         │
-│ • Sidepanel mgmt│ • Drag handling     │ • Zoom control          │
-└─────────────────┴─────────────────────┴─────────────────────────┘
-                          ↕ Crann State Sync ↕
+┌───────────────────────────────────────────────────────┐
+│                   Chrome Extension                     │
+├─────────────────────┬─────────────────────────────────┤
+│   Service Worker    │         Content Script          │
+│   (Background)      │         (Per-Tab UI)            │
+├─────────────────────┼─────────────────────────────────┤
+│ • Extension APIs    │ • Shadow DOM host               │
+│ • tabCapture        │ • React app (Lens + Drawer)     │
+│ • State hub         │ • Canvas rendering              │
+│                     │ • Drag handling                 │
+│                     │ • Slide drawer controls         │
+└─────────────────────┴─────────────────────────────────┘
+                    ↕ Crann State Sync ↕
 ```
 
 ### Screen Capture Flow
@@ -51,14 +52,13 @@ To address the persistent screen recording indicator, the extension auto-shuts d
    - `useMediaCapture` cleanup runs, calling `track.stop()` on MediaStream
    - Chrome's recording indicator disappears
    - UI becomes hidden
-   - Sidepanel closes
 5. User can restart by clicking the extension icon (existing flow handles this)
 
 ### State Management (Crann)
 
 State items have two partition types:
 
-- **`Partition.Instance`**: Per-tab state (e.g., `active`, `mediaStreamId`, `isSidepanelShown`)
+- **`Partition.Instance`**: Per-tab state (e.g., `active`, `mediaStreamId`)
 - **`Partition.Service`**: Global state shared across all tabs (e.g., `zoom`, `hoveredColor`, `colorPalette`)
 
 Key state items:
@@ -66,7 +66,6 @@ Key state items:
 |------|-----------|---------|
 | `active` | Instance | Whether lens is visible on this tab |
 | `mediaStreamId` | Instance | Tab capture stream identifier |
-| `isSidepanelShown` | Instance | Sidepanel visibility for this tab |
 | `hoveredColor` | Service | Currently detected color (rgb string) |
 | `colorPalette` | Service | Generated harmony colors (array) |
 | `materialPalette` | Service | Material Design tones (object) |
@@ -91,7 +90,9 @@ Key state items:
 - **Fisheye Effect**: WebGL-based fisheye distortion (aesthetic feature)
 - **Adaptive Theming**: Lens handle/border colors adapt to detected color
 
-### Controls (Sidepanel)
+### Controls (Slide Drawer)
+
+A slide-out drawer UI attached to the lens provides quick access to settings:
 
 - Toggle grid overlay
 - Toggle fisheye effect
@@ -106,7 +107,7 @@ src/
 │   └── service-worker.ts    # Extension background script
 ├── scripts/
 │   └── content-script.ts    # Minimal bootstrap (mostly unused now)
-├── ui/                      # Injected React app (the Lense)
+├── ui/                      # Injected React app (Lens + Drawer)
 │   ├── index.tsx            # Entry point, Shadow DOM setup, Crann connect
 │   ├── state-config.ts      # Crann state configuration
 │   ├── features/
@@ -122,16 +123,7 @@ src/
 │   │   ├── useInactivityTimeout.ts # Auto-shutdown after inactivity
 │   │   └── useLensorState.ts     # Crann hook wrapper
 │   └── utils/               # Color, coordinate, debug utilities
-├── sidepanel/               # Chrome sidepanel React app
-│   ├── index.tsx            # Entry point
-│   ├── App.tsx              # Main container
-│   ├── components/          # Reusable UI components
-│   └── features/            # Feature-specific components
-│       ├── home/            # Main controls view
-│       ├── color-palette/   # Palette display components
-│       ├── colors/          # Color display component
-│       ├── zoom-control/    # Zoom slider
-│       └── crop-controls/   # (WIP)
+├── sidepanel/               # DEPRECATED — Chrome sidepanel (replaced by slide drawer)
 ├── lib/                     # WebGL fisheye implementation
 │   ├── fisheyegl.ts
 │   └── shaders/             # GLSL shaders
@@ -149,7 +141,7 @@ src/
 | Styling        | styled-components                  |
 | State Sync     | Crann (custom library)             |
 | Build Tool     | esbuild                            |
-| Extension APIs | Manifest V3, tabCapture, sidePanel |
+| Extension APIs | Manifest V3, tabCapture            |
 | Graphics       | Canvas 2D, WebGL (fisheye)         |
 
 ## Dependencies
@@ -183,7 +175,7 @@ npm run type-check
 The build script (`build.mjs`):
 
 1. Auto-increments patch version in `manifest.json`
-2. Bundles service worker, content script, UI, and sidepanel
+2. Bundles service worker, content script, and UI
 3. Copies assets and HTML files to `dist/`
 
 **Loading in Chrome**: Load `dist/` folder as unpacked extension at `chrome://extensions`
@@ -194,19 +186,24 @@ The build script (`build.mjs`):
 
 Implementing color palette generation from the detected pixel color:
 
-- Monochromatic color harmony generation
-- Material Design tone generation (50–900 weights)
-- Palette display in sidepanel
-- Adaptive lens theming based on palette
+- ✅ Monochromatic color harmony generation
+- ✅ Material Design tone generation (50–900 weights)
+- ✅ Palette display in slide drawer
+- ✅ Adaptive lens theming based on palette
 
 ## Known Considerations
 
 - **Version number**: Currently auto-increments on every build (dev convenience). Needs manual versioning for release.
 - **Screen sharing indicator**: Chrome shows recording icon while `MediaStream` is active. Mitigated by the inactivity timeout feature which stops the stream after 20 minutes of no user interaction. User can restart by clicking the extension icon.
-- **Recapture timing**: May capture the lens itself if not hidden. Position may reset during recapture.
+- **Recapture flicker**: During recapture, the lens hides/shows with some flickering. See IDEAS.md for planned animation improvements.
+
+## Cleanup Required
+
+- **Sidepanel removal**: The `src/sidepanel/` directory and related manifest/build references should be removed. The sidepanel has been replaced by the slide drawer UI integrated into the main lens component.
 
 ## Ignored Directories
 
 - `scratch/` — Experimental scripts, not part of the project
 - `src/devtools/` — Abandoned devtools panel attempt
+- `src/sidepanel/` — Deprecated sidepanel (to be removed)
 - `.prompts/` — Legacy AI prompt documentation (superseded by `.context/`)
