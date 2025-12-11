@@ -15,3 +15,6 @@ scratch/
 
 # Release artifacts
 lensor-release.zip
+
+# Raw screenshots (large files, processed versions are in screenshots/store/)
+screenshots/raw/

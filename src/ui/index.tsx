@@ -84,7 +84,6 @@ const [_isSidepanelShown, setIsSidepanelShown] = useCrann('isSidepanelShown');
  */
 function shutdownLensor() {
   log('Shutting down Lensor due to inactivity');
-  console.log('[Lensor] Shutting down due to inactivity...');
 
   // Set active to false - this triggers MediaStream cleanup in useMediaCapture
   setActive(false);
@@ -93,7 +92,6 @@ function shutdownLensor() {
   setIsSidepanelShown(false);
 
   // The visibility toggle will happen automatically via onActive subscription
-  console.log('[Lensor] Shutdown complete - click extension icon to restart');
 }
 
 // Export for use by Lense component
@@ -117,7 +115,6 @@ onActive((update) => {
 const toggleShadowRootVisibility = (visible: boolean) => {
   if (self !== top || !state.shadowContainer) return;
   log('Setting visibility: %s', visible);
-  console.log('[Lensor] Setting UI visibility:', visible);
   let newStyle: Partial<CSSStyleDeclaration> = styles.container.shadow;
   if (!visible) {
     newStyle = { ...newStyle, ...styles.container.invisible };
