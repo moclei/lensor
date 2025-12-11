@@ -7,49 +7,50 @@ flowchart TB
         C --> D[UI becomes visible]
     end
 
-    subgraph StreamSetup["📡 Stream Setup"]
-        D --> E[UI calls getMediaStreamId<br>action via Crann RPC]
-        E --> F[Service Worker:<br>chrome.tabCapture.getMediaStreamId]
-        F --> G[Return mediaStreamId token]
-        G --> H[UI: navigator.mediaDevices<br>.getUserMedia]
-        H --> I["MediaStream created<br>🔴 Recording indicator ON"]
-        I --> J[new ImageCapture<br>from video track]
+    subgraph Capture["📸 Tab Capture (captureVisibleTab)"]
+        D --> E[UI calls captureTab<br>action via Crann RPC]
+        E --> F["Service Worker:<br>chrome.tabs.captureVisibleTab()<br>✅ No recording indicator!"]
+        F --> G[Return data URL<br>~12MB PNG string]
     end
 
-    subgraph FrameCapture["📸 Frame Capture"]
-        J --> K[Wait: requestAnimationFrame ×2<br>+ 50ms delay]
-        K --> L["imageCapture.grabFrame()<br>→ ImageBitmap ~8MB"]
-        L --> M{Has black<br>borders?}
-        M -->|Yes| N[createImageBitmap<br>crop borders]
-        N --> O["sourceBitmap.close()<br>✅ Free ~8MB"]
-        M -->|No| P[Use original]
-        O --> Q[Store in React state]
-        P --> Q
+    subgraph Convert["🔄 Conversion"]
+        G --> H[new Image<br>src = dataUrl]
+        H --> I["createImageBitmap()<br>→ ImageBitmap ~8MB"]
+        I --> J[Data URL garbage collected]
     end
 
-    subgraph CanvasRendering["🎨 Canvas Rendering"]
-        Q --> R{Fisheye ON?}
-        R -->|No| S[drawImage direct<br>to mainCanvas 400×400]
-        R -->|Yes| T[drawImage to<br>interCanvas]
-        T --> U[WebGL: upload<br>as texture]
-        U --> V[Apply fisheye<br>shader]
-        V --> W[Draw to<br>mainCanvas]
-        S --> X["getImageData()<br>sample center pixel"]
-        W --> X
-        X --> Y[Update color<br>and palettes]
+    subgraph Process["⚙️ Processing"]
+        J --> K{Has black<br>borders?}
+        K -->|Yes| L[createImageBitmap<br>crop borders]
+        L --> M["sourceBitmap.close()<br>✅ Free ~8MB"]
+        K -->|No| N[Use original]
+        M --> O["Close previous bitmap<br>✅ Memory managed"]
+        N --> O
+        O --> P[Store in React state]
     end
 
-    subgraph RecaptureLoop["🔄 Recapture Loop"]
-        Y --> Z{Page changed?}
-        Z -->|"Scroll/Resize/<br>DOM mutation"| AA[Trigger recapture<br>❌ Old bitmap NOT closed]
-        AA --> K
-        Z -->|No| AB[Wait for<br>user interaction]
-        AB --> Z
+    subgraph Render["🎨 Canvas Rendering"]
+        P --> Q{Fisheye ON?}
+        Q -->|No| R[drawImage direct<br>to mainCanvas 400×400]
+        Q -->|Yes| S[drawImage to<br>interCanvas]
+        S --> T[WebGL: upload<br>as texture]
+        T --> U[Apply fisheye<br>shader]
+        U --> V[Draw to<br>mainCanvas]
+        R --> W["getImageData()<br>sample center pixel"]
+        V --> W
+        W --> X[Update color<br>and palettes]
     end
 
-    style I fill:#f56565,stroke:#c53030,color:#fff
-    style L fill:#ed8936,stroke:#dd6b20,color:#fff
+    subgraph Recapture["🔄 Recapture Loop"]
+        X --> Y{Page changed?}
+        Y -->|"Scroll/Resize/<br>DOM mutation"| Z["Trigger recapture<br>(rate limit: 2/sec)"]
+        Z --> E
+        Y -->|No| AA[Wait for<br>user interaction]
+        AA --> Y
+    end
+
+    style F fill:#48bb78,stroke:#38a169,color:#fff
+    style I fill:#ed8936,stroke:#dd6b20,color:#fff
+    style M fill:#48bb78,stroke:#38a169,color:#fff
     style O fill:#48bb78,stroke:#38a169,color:#fff
-    style AA fill:#f56565,stroke:#c53030,color:#fff
-    style Y fill:#9f7aea,stroke:#805ad5,color:#fff
-
+    style X fill:#9f7aea,stroke:#805ad5,color:#fff
