@@ -23,6 +23,15 @@ interface UseMediaCaptureResult {
   error: Error | null;
 }
 
+/**
+ * Hook for capturing tab screenshots using chrome.tabs.captureVisibleTab.
+ *
+ * This approach captures single screenshots instead of maintaining a continuous
+ * video stream, which:
+ * - Eliminates the persistent "recording" indicator in Chrome
+ * - Uses less resources when idle
+ * - Has a rate limit of 2 captures per second (enforced by Chrome)
+ */
 export function useMediaCapture(
   options: UseMediaCaptureOptions = {}
 ): UseMediaCaptureResult {
@@ -33,89 +42,14 @@ export function useMediaCapture(
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const activeImageCaptureRef = useRef<ImageCapture | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
+  // Track the current bitmap so we can close it when replaced
+  const currentBitmapRef = useRef<ImageBitmap | null>(null);
 
   const [active] = useStateItem('active');
 
-  const fetchMediaStreamId = async () => {
-    log('Fetching media stream ID');
-    const mediaStreamId = await callAction('getMediaStreamId');
-    log('Received stream ID: %s', mediaStreamId);
-    setupMediaCapture(mediaStreamId);
-  };
-
-  useEffect(() => {
-    if (active) {
-      fetchMediaStreamId();
-    }
-  }, [active]);
-
-  // Clean up function
-  const cleanupMediaCapture = useCallback(() => {
-    log('Cleaning up media capture');
-    if (mediaStreamRef.current) {
-      try {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      } catch (e) {
-        console.error('[useMediaCapture] Error stopping media stream tracks:', e);
-      }
-      mediaStreamRef.current = null;
-    }
-
-    if (activeImageCaptureRef.current) {
-      activeImageCaptureRef.current = null;
-    }
-  }, []);
-
-  // Setup media capture
-  const setupMediaCapture = useCallback(
-    async (streamId: string) => {
-      log('Setting up media capture');
-      setIsCapturing(true);
-      setError(null);
-
-      try {
-        cleanupMediaCapture();
-
-        const media = await createMediaStream(streamId);
-
-        if (!media) {
-          throw new Error('Failed to create media stream');
-        }
-
-        log('Media stream created successfully');
-        mediaStreamRef.current = media;
-        activeImageCaptureRef.current = new ImageCapture(
-          media.getVideoTracks()[0]
-        );
-
-        if (autoCapture) {
-          await captureFrame();
-        } else {
-          setIsCapturing(false);
-        }
-      } catch (error) {
-        console.error('[useMediaCapture] Error setting up media capture:', error);
-        setError(
-          error instanceof Error
-            ? error
-            : new Error('Unknown error in media capture setup')
-        );
-        setIsCapturing(false);
-      }
-    },
-    [autoCapture, cleanupMediaCapture]
-  );
-
-  // Capture a frame
+  // Capture a frame using captureVisibleTab
   const captureFrame = useCallback(async () => {
-    if (!activeImageCaptureRef.current) {
-      console.error('[useMediaCapture] No active image capture available');
-      setError(new Error('No active image capture available'));
-      return;
-    }
-
+    log('Capturing frame via captureVisibleTab');
     setIsCapturing(true);
     setError(null);
 
@@ -128,16 +62,34 @@ export function useMediaCapture(
       });
     });
 
-    // Additional delay for the tab capture stream to reflect the updated screen
+    // Additional delay for UI to fully hide
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     try {
-      const rawBitmap = await activeImageCaptureRef.current.grabFrame();
-      log('Frame captured');
+      // Call the service worker action to capture the tab
+      const dataUrl = await callAction('captureTab');
 
+      if (!dataUrl) {
+        throw new Error('Failed to capture tab - no data URL returned');
+      }
+
+      log('Received data URL, converting to ImageBitmap');
+
+      // Convert data URL to ImageBitmap
+      const rawBitmap = await dataUrlToImageBitmap(dataUrl);
+
+      log('Frame captured, dimensions: %dx%d', rawBitmap.width, rawBitmap.height);
+
+      // Calculate and crop black borders (letterboxing/pillarboxing)
       const cropMetrics = calculateImageBlackBorder(rawBitmap);
       const processedBitmap = await cropImageBlackBorder(rawBitmap, cropMetrics);
 
+      // Close the old bitmap before setting new one (prevent memory leak)
+      if (currentBitmapRef.current) {
+        currentBitmapRef.current.close();
+      }
+
+      currentBitmapRef.current = processedBitmap;
       setImageBitmap(processedBitmap);
     } catch (error) {
       console.error('[useMediaCapture] Error capturing frame:', error);
@@ -149,20 +101,32 @@ export function useMediaCapture(
     } finally {
       setIsCapturing(false);
     }
-  }, []);
+  }, [callAction]);
 
-  // Effect to handle changes to the media stream ID or active state
+  // Auto-capture when active becomes true
   useEffect(() => {
-    if (mediaStreamRef.current && !active) {
-      log('Active is false, cleaning up');
-      cleanupMediaCapture();
+    if (active && autoCapture) {
+      captureFrame();
+    }
+  }, [active, autoCapture, captureFrame]);
+
+  // Cleanup when active becomes false or component unmounts
+  useEffect(() => {
+    if (!active && currentBitmapRef.current) {
+      log('Active is false, cleaning up bitmap');
+      currentBitmapRef.current.close();
+      currentBitmapRef.current = null;
       setImageBitmap(null);
     }
 
     return () => {
-      cleanupMediaCapture();
+      // Cleanup on unmount
+      if (currentBitmapRef.current) {
+        currentBitmapRef.current.close();
+        currentBitmapRef.current = null;
+      }
     };
-  }, [mediaStreamRef, active, setupMediaCapture, cleanupMediaCapture]);
+  }, [active]);
 
   return {
     imageBitmap,
@@ -173,24 +137,31 @@ export function useMediaCapture(
 }
 
 // Helper functions
-async function createMediaStream(
-  streamId: string
-): Promise<MediaStream | null> {
-  try {
-    const media = await (navigator.mediaDevices as any).getUserMedia({
-      video: {
-        mandatory: {
-          chromeMediaSource: 'tab',
-          chromeMediaSourceId: streamId
-        }
+
+/**
+ * Convert a data URL to an ImageBitmap.
+ * This is the bridge between captureVisibleTab (returns data URL) and our canvas pipeline.
+ */
+async function dataUrlToImageBitmap(dataUrl: string): Promise<ImageBitmap> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = async () => {
+      try {
+        // createImageBitmap is the efficient way to get GPU-ready image data
+        const bitmap = await createImageBitmap(img);
+        resolve(bitmap);
+      } catch (err) {
+        reject(err);
       }
-    });
-    log('Media stream obtained');
-    return media;
-  } catch (error) {
-    console.error('[useMediaCapture] Error starting recording:', error);
-    return null;
-  }
+    };
+
+    img.onerror = () => {
+      reject(new Error('Failed to load image from data URL'));
+    };
+
+    img.src = dataUrl;
+  });
 }
 
 function calculateImageBlackBorder(imageBitmap: ImageBitmap): BorderCropProps {

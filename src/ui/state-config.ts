@@ -13,10 +13,12 @@ export const LensorStateConfig = {
     default: false,
     partition: Partition.Instance
   },
-  mediaStreamId: {
-    default: null as string | null,
-    partition: Partition.Instance
-  },
+  // DEPRECATED: mediaStreamId is no longer used with captureVisibleTab approach
+  // Keeping for now in case we need to revert to MediaStream approach
+  // mediaStreamId: {
+  //   default: null as string | null,
+  //   partition: Partition.Instance
+  // },
   isSidepanelShown: {
     default: false,
     partition: Partition.Instance
@@ -41,6 +43,10 @@ export const LensorStateConfig = {
     default: false,
     partition: Partition.Instance
   },
+  autoRefresh: {
+    default: false,
+    partition: Partition.Instance
+  },
   zoom: {
     default: 3,
     partition: Partition.Instance
@@ -53,23 +59,46 @@ export const LensorStateConfig = {
     default: { x: 0, y: 0 },
     partition: Partition.Service
   },
-  getMediaStreamId: {
+  // DEPRECATED: getMediaStreamId is no longer used with captureVisibleTab approach
+  // Keeping for now in case we need to revert to MediaStream approach
+  // getMediaStreamId: {
+  //   handler: async (
+  //     state: any,
+  //     setState: (newState: Partial<any>) => Promise<void>,
+  //     target: BrowserLocation
+  //   ) => {
+  //     log('Getting media stream ID for tab: %d', target.tabId);
+  //     const mediaStreamId = await (chrome.tabCapture as any).getMediaStreamId({
+  //       consumerTabId: target.tabId,
+  //       targetTabId: target.tabId
+  //     });
+  //     log('Media stream ID obtained');
+  //     return mediaStreamId;
+  //   },
+  //   validate: (amount: number) => {
+  //     if (amount < 0) throw new Error('Amount must be positive');
+  //   }
+  // },
+  // New action: Capture visible tab as a single screenshot (no video stream)
+  captureTab: {
     handler: async (
       state: any,
       setState: (newState: Partial<any>) => Promise<void>,
       target: BrowserLocation
     ) => {
-      log('Getting media stream ID for tab: %d', target.tabId);
-      const mediaStreamId = await (chrome.tabCapture as any).getMediaStreamId({
-        consumerTabId: target.tabId,
-        targetTabId: target.tabId
+      log('Capturing visible tab: %d', target.tabId);
+
+      // Get the window ID for this tab
+      const tab = await chrome.tabs.get(target.tabId);
+      const windowId = tab.windowId;
+
+      // Capture the visible area of the tab
+      const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+        format: 'png'
       });
 
-      log('Media stream ID obtained');
-      return mediaStreamId;
-    },
-    validate: (amount: number) => {
-      if (amount < 0) throw new Error('Amount must be positive');
+      log('Tab captured, data URL length: %d', dataUrl.length);
+      return dataUrl;
     }
   }
 };

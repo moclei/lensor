@@ -47,6 +47,16 @@
       margin-bottom: 40px;
       font-size: 14px;
     }
+    .badge {
+      display: inline-block;
+      background: #48bb78;
+      color: #1a202c;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
     .diagram-container {
       background: #f7fafc;
       border-radius: 16px;
@@ -107,23 +117,69 @@
       color: #cbd5e0;
     }
     .notes li::before {
-      content: '→';
+      content: '✓';
       position: absolute;
       left: 0;
+      color: #48bb78;
+    }
+    .notes li.info::before {
+      content: '→';
       color: #667eea;
     }
-    .notes li.warning::before {
-      content: '⚠️';
+    .comparison {
+      max-width: 800px;
+      margin: 0 auto 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
     }
-    .notes li.good::before {
-      content: '✓';
-      color: #48bb78;
+    .comparison-card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .comparison-card.old {
+      border-left: 4px solid #f56565;
+    }
+    .comparison-card.new {
+      border-left: 4px solid #48bb78;
+    }
+    .comparison-card h4 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .comparison-card code {
+      display: block;
+      font-size: 12px;
+      color: #a0aec0;
+      margin-top: 8px;
     }
   </style>
 </head>
 <body>
-  <h1>Lensor Tab Capture Pipeline</h1>
-  <p class="subtitle">Visual reference for the screen capture → canvas display flow</p>
+  <h1>Lensor Tab Capture Pipeline <span class="badge">v1.0.2+</span></h1>
+  <p class="subtitle">Visual reference for the screen capture → canvas display flow (captureVisibleTab approach)</p>
+
+  <!-- Comparison Cards -->
+  <div class="comparison">
+    <div class="comparison-card old">
+      <h4>❌ Old Approach (pre-1.0.2)</h4>
+      <code>tabCapture → MediaStream → ImageCapture → grabFrame()</code>
+      <p style="font-size: 12px; color: #cbd5e0; margin-top: 12px;">
+        Persistent video stream caused recording indicator
+      </p>
+    </div>
+    <div class="comparison-card new">
+      <h4>✅ New Approach (1.0.2+)</h4>
+      <code>captureVisibleTab → Data URL → ImageBitmap</code>
+      <p style="font-size: 12px; color: #cbd5e0; margin-top: 12px;">
+        Single screenshots, no recording indicator
+      </p>
+    </div>
+  </div>
 
   <!-- Main Flowchart -->
   <div class="diagram-container">
@@ -138,16 +194,16 @@ flowchart LR
     subgraph SW["Service Worker"]
         direction TB
         B[chrome.action<br>.onClicked] --> C[Set active=true<br>via Crann]
-        C --> D[chrome.tabCapture<br>.getMediaStreamId]
-        D --> E[Return token]
+        C --> D[captureTab action<br>called via RPC]
+        D --> E[chrome.tabs<br>.captureVisibleTab]
+        E --> F[Return data URL]
     end
 
     subgraph UI["Content Script / React"]
         direction TB
-        F[navigator.mediaDevices<br>.getUserMedia] --> G[MediaStream<br>📹 Live video feed]
-        G --> H[new ImageCapture<br>from video track]
-        H --> I[grabFrame<br>→ ImageBitmap]
-        I --> J[Crop borders<br>createImageBitmap]
+        G[Receive data URL<br>~12MB string] --> H[new Image<br>src = dataUrl]
+        H --> I[createImageBitmap<br>~8MB GPU memory]
+        I --> J[Crop black borders]
         J --> K[Close old bitmap ✓]
         K --> L[Store in<br>React state]
     end
@@ -170,11 +226,11 @@ flowchart LR
     end
 
     A --> B
-    E --> F
+    F --> G
     L --> M
 
     style A fill:#667eea,stroke:#5a67d8,color:#fff
-    style G fill:#f56565,stroke:#c53030,color:#fff
+    style E fill:#48bb78,stroke:#38a169,color:#fff
     style I fill:#ed8936,stroke:#dd6b20,color:#fff
     style K fill:#48bb78,stroke:#38a169,color:#fff
     style S fill:#9f7aea,stroke:#805ad5,color:#fff
@@ -185,16 +241,12 @@ flowchart LR
         <span>User Action</span>
       </div>
       <div class="legend-item">
-        <div class="legend-color" style="background: #f56565"></div>
-        <span>MediaStream (recording indicator)</span>
+        <div class="legend-color" style="background: #48bb78"></div>
+        <span>No Recording Indicator ✓</span>
       </div>
       <div class="legend-item">
         <div class="legend-color" style="background: #ed8936"></div>
         <span>ImageBitmap (~8MB)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: #48bb78"></div>
-        <span>Memory cleanup</span>
       </div>
       <div class="legend-item">
         <div class="legend-color" style="background: #9f7aea"></div>
@@ -208,34 +260,42 @@ flowchart LR
     <div class="diagram-title">Memory Allocation During Capture Cycle</div>
     <pre class="mermaid">
 flowchart TD
-    subgraph CAPTURE["Frame Capture"]
-        A["grabFrame()"] --> B["Raw ImageBitmap<br>🟧 ~8MB GPU memory"]
+    subgraph CAPTURE["Tab Capture"]
+        A["captureVisibleTab()"] --> B["Data URL string<br>🟧 ~12MB (base64 PNG)"]
+    end
+
+    subgraph CONVERT["Conversion"]
+        B --> C["new Image()"]
+        C --> D["createImageBitmap()<br>🟧 ~8MB GPU memory"]
+        D --> E["Data URL garbage collected<br>🟩 ~12MB freed"]
     end
 
     subgraph PROCESS["Processing"]
-        B --> C{"Needs<br>cropping?"}
-        C -->|Yes| D["createImageBitmap()<br>🟧 +8MB (cropped)"]
-        D --> E["sourceBitmap.close()<br>🟩 -8MB freed"]
-        C -->|No| F["Use original"]
+        E --> F{"Needs<br>cropping?"}
+        F -->|Yes| G["createImageBitmap() cropped<br>🟧 +8MB"]
+        G --> H["sourceBitmap.close()<br>🟩 -8MB freed"]
+        F -->|No| I["Use original"]
     end
 
-    subgraph STATE["React State"]
-        E --> G["setImageBitmap()<br>🟥 Old bitmap orphaned!"]
-        F --> G
-        G --> H["New bitmap in state<br>🟧 8MB"]
+    subgraph STATE["React State Update"]
+        H --> J["Close previous bitmap<br>🟩 -8MB freed"]
+        I --> J
+        J --> K["setImageBitmap()<br>🟧 8MB persists"]
     end
 
     subgraph CANVAS["Canvas Drawing"]
-        H --> I["drawImage()<br>No new allocation"]
-        I --> J["Canvas pixels<br>400×400×4 = 640KB"]
+        K --> L["drawImage()<br>No new allocation"]
+        L --> M["Canvas pixels<br>400×400×4 = 640KB"]
     end
 
     style B fill:#ed8936,stroke:#dd6b20,color:#fff
     style D fill:#ed8936,stroke:#dd6b20,color:#fff
     style E fill:#48bb78,stroke:#38a169,color:#fff
-    style G fill:#f56565,stroke:#c53030,color:#fff
-    style H fill:#ed8936,stroke:#dd6b20,color:#fff
-    style J fill:#4299e1,stroke:#3182ce,color:#fff
+    style G fill:#ed8936,stroke:#dd6b20,color:#fff
+    style H fill:#48bb78,stroke:#38a169,color:#fff
+    style J fill:#48bb78,stroke:#38a169,color:#fff
+    style K fill:#ed8936,stroke:#dd6b20,color:#fff
+    style M fill:#4299e1,stroke:#3182ce,color:#fff
     </pre>
   </div>
 
@@ -258,35 +318,31 @@ sequenceDiagram
     C-->>UI: State change notification
     activate UI
     
-    UI->>C: callAction('getMediaStreamId')
+    UI->>C: callAction('captureTab')
     C->>SW: RPC request
-    SW->>CH: tabCapture.getMediaStreamId()
-    CH-->>SW: mediaStreamId token
-    SW-->>C: Return token
-    C-->>UI: mediaStreamId
+    SW->>CH: tabs.captureVisibleTab()
+    Note over CH: ✅ No recording indicator!
+    CH-->>SW: Data URL (PNG ~12MB)
+    SW-->>C: Return data URL
+    C-->>UI: dataUrl
     
-    UI->>CH: getUserMedia({ chromeMediaSourceId })
-    Note over CH: 🔴 Recording indicator ON
-    CH-->>UI: MediaStream
+    UI->>UI: new Image().src = dataUrl
+    UI->>UI: createImageBitmap()
     
-    UI->>UI: new ImageCapture(track)
-    
-    rect rgb(255, 243, 224)
-        Note over UI: Hide lens before capture
-        UI->>UI: requestAnimationFrame × 2
-        UI->>UI: setTimeout(50ms)
-    end
-    
-    UI->>CH: grabFrame()
-    CH-->>UI: ImageBitmap (full tab)
-    
-    UI->>UI: Crop borders
+    UI->>UI: Crop black borders
     UI->>UI: Close original ✅
+    UI->>UI: Close previous state bitmap ✅
     UI->>UI: setImageBitmap()
     
     UI->>UI: drawImage to canvas
     UI->>UI: getImageData(center)
     UI-->>U: 🎨 Color displayed
+    
+    rect rgb(230, 255, 230)
+        Note over UI,CH: On page scroll/resize/mutation
+        UI->>C: callAction('captureTab')
+        Note over UI: New capture cycle (rate limited: 2/sec)
+    end
     
     deactivate UI
     deactivate SW
@@ -295,23 +351,19 @@ sequenceDiagram
 
   <!-- Notes Section -->
   <div class="notes">
-    <h3>Key Observations</h3>
+    <h3>Key Improvements (v1.0.2+)</h3>
     <ul>
-      <li>MediaStream stays open continuously → causes persistent recording indicator</li>
-      <li class="warning">Old ImageBitmap not closed when React state is updated → potential memory leak</li>
-      <li>Full tab captured (~8MB) but only small portion displayed in 400×400 lens</li>
-      <li class="good">Original bitmap is properly closed after cropping</li>
-      <li>Fisheye path adds 2 extra canvas copies before final display</li>
-      <li>Each recapture (scroll/resize/DOM change) repeats the full capture cycle</li>
+      <li>No recording indicator — uses captureVisibleTab instead of MediaStream</li>
+      <li>Proper memory cleanup — old ImageBitmaps explicitly closed before replacement</li>
+      <li>Simpler architecture — no MediaStream/ImageCapture objects to manage</li>
+      <li>Lower idle resource usage — no persistent video capture pipeline</li>
+      <li class="info">Rate limited to 2 captures/second (Chrome enforced)</li>
+      <li class="info">Peak memory ~24MB during capture, settles to ~8MB</li>
     </ul>
   </div>
 
   <script>
-    // Add ability to right-click save as PNG
-    document.addEventListener('contextmenu', (e) => {
-      console.log('Tip: Use browser DevTools to screenshot individual diagrams');
-    });
+    console.log('Tip: Use browser DevTools to screenshot individual diagrams');
   </script>
 </body>
 </html>
-

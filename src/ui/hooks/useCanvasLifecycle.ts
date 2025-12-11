@@ -84,7 +84,9 @@ export function useCanvasLifecycle({
 
   // Canvas initialization effect - for image-dependent operations
   useEffect(() => {
-    if (active && imageBitmap) {
+    // Guard: Only run if canvas is actually mounted in the DOM
+    // (The component may return early during capture, leaving canvas unmounted)
+    if (active && imageBitmap && mainCanvasRef.current) {
       log('Initializing with image bitmap');
 
       // Calculate scale
@@ -99,7 +101,7 @@ export function useCanvasLifecycle({
         onDrawComplete(canvasCenter);
       }
     }
-  }, [active, imageBitmap, getCanvasCenter, onDrawComplete]);
+  }, [active, imageBitmap, mainCanvasRef, getCanvasCenter, onDrawComplete]);
 
   // Final draw complete effect
   useEffect(() => {

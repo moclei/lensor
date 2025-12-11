@@ -155,7 +155,10 @@ export function usePageObservers(
         scoreIncrement += mutation.addedNodes.length * 2;
         scoreIncrement += mutation.removedNodes.length;
       } else if (mutation.type === 'attributes') {
-        scoreIncrement += 0.5;
+        // Attribute changes (e.g., carousel image src, class changes) should
+        // contribute meaningfully to the score. Previously 0.5 was too low
+        // and required 280 attribute changes to trigger recapture.
+        scoreIncrement += 2;
       }
     });
 

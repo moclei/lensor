@@ -86,6 +86,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
 
   const [gridOn, setGridOn] = useStateItem('showGrid');
   const [fisheyeOn, setFisheyeOn] = useStateItem('showFisheye');
+  const [autoRefresh, setAutoRefresh] = useStateItem('autoRefresh');
   const [zoom, setZoom] = useStateItem('zoom');
   const [active] = useStateItem('active');
 
@@ -132,7 +133,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
 
   const { lastChangeTimestamp, lastScrollPosition } = usePageObservers(
     () => {
-      if (active && !isCapturing) {
+      if (active && !isCapturing && autoRefresh) {
         log('Page change detected, recapturing');
         captureFrame();
         // Reset inactivity timer on page interaction (scroll, resize, DOM changes)
@@ -220,6 +221,11 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     setFisheyeOn(!fisheyeOn);
     resetActivity();
   }, [fisheyeOn, setFisheyeOn, resetActivity]);
+
+  const handleAutoRefreshToggle = useCallback(() => {
+    setAutoRefresh(!autoRefresh);
+    resetActivity();
+  }, [autoRefresh, setAutoRefresh, resetActivity]);
 
   const handleZoomChange = useCallback(
     (newZoom: number) => {
@@ -360,6 +366,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
           isOpen={drawerOpen}
           gridOn={gridOn}
           fisheyeOn={fisheyeOn}
+          autoRefresh={autoRefresh}
           zoom={zoom}
           hoveredColor={hoveredColor}
           colorPalette={colorPalette}
@@ -367,6 +374,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
           onToggle={handleDrawerToggle}
           onGridToggle={handleGridToggle}
           onFisheyeToggle={handleFisheyeToggle}
+          onAutoRefreshToggle={handleAutoRefreshToggle}
           onZoomChange={handleZoomChange}
         />
       )}

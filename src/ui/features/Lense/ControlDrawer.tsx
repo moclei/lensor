@@ -42,6 +42,7 @@ interface ControlDrawerProps {
   isOpen: boolean;
   gridOn: boolean;
   fisheyeOn: boolean;
+  autoRefresh: boolean;
   zoom: number;
   hoveredColor: string;
   colorPalette: string[];
@@ -50,6 +51,7 @@ interface ControlDrawerProps {
   onToggle: () => void;
   onGridToggle: () => void;
   onFisheyeToggle: () => void;
+  onAutoRefreshToggle: () => void;
   onZoomChange: (newZoom: number) => void;
 }
 
@@ -63,6 +65,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   isOpen,
   gridOn,
   fisheyeOn,
+  autoRefresh,
   zoom,
   hoveredColor,
   colorPalette,
@@ -70,6 +73,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   onToggle,
   onGridToggle,
   onFisheyeToggle,
+  onAutoRefreshToggle,
   onZoomChange
 }) => {
   const [copyTooltip, setCopyTooltip] = useState<string | null>(null);
@@ -156,6 +160,14 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
               title="Toggle fisheye effect"
             >
               ◉
+            </ToggleButton>
+
+            <ToggleButton
+              isActive={autoRefresh}
+              onClick={onAutoRefreshToggle}
+              title="Auto-refresh on page changes"
+            >
+              ↻
             </ToggleButton>
 
             <ZoomControl>
