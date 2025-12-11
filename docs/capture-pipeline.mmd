@@ -1,0 +1,55 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4a5568', 'primaryTextColor': '#fff', 'lineColor': '#718096', 'secondaryColor': '#667eea'}}}%%
+
+flowchart TB
+    subgraph Activation["🖱️ Extension Activation"]
+        A[User clicks<br>extension icon] --> B[Service Worker:<br>chrome.action.onClicked]
+        B --> C[Set active=true<br>via Crann]
+        C --> D[UI becomes visible]
+    end
+
+    subgraph StreamSetup["📡 Stream Setup"]
+        D --> E[UI calls getMediaStreamId<br>action via Crann RPC]
+        E --> F[Service Worker:<br>chrome.tabCapture.getMediaStreamId]
+        F --> G[Return mediaStreamId token]
+        G --> H[UI: navigator.mediaDevices<br>.getUserMedia]
+        H --> I["MediaStream created<br>🔴 Recording indicator ON"]
+        I --> J[new ImageCapture<br>from video track]
+    end
+
+    subgraph FrameCapture["📸 Frame Capture"]
+        J --> K[Wait: requestAnimationFrame ×2<br>+ 50ms delay]
+        K --> L["imageCapture.grabFrame()<br>→ ImageBitmap ~8MB"]
+        L --> M{Has black<br>borders?}
+        M -->|Yes| N[createImageBitmap<br>crop borders]
+        N --> O["sourceBitmap.close()<br>✅ Free ~8MB"]
+        M -->|No| P[Use original]
+        O --> Q[Store in React state]
+        P --> Q
+    end
+
+    subgraph CanvasRendering["🎨 Canvas Rendering"]
+        Q --> R{Fisheye ON?}
+        R -->|No| S[drawImage direct<br>to mainCanvas 400×400]
+        R -->|Yes| T[drawImage to<br>interCanvas]
+        T --> U[WebGL: upload<br>as texture]
+        U --> V[Apply fisheye<br>shader]
+        V --> W[Draw to<br>mainCanvas]
+        S --> X["getImageData()<br>sample center pixel"]
+        W --> X
+        X --> Y[Update color<br>and palettes]
+    end
+
+    subgraph RecaptureLoop["🔄 Recapture Loop"]
+        Y --> Z{Page changed?}
+        Z -->|"Scroll/Resize/<br>DOM mutation"| AA[Trigger recapture<br>❌ Old bitmap NOT closed]
+        AA --> K
+        Z -->|No| AB[Wait for<br>user interaction]
+        AB --> Z
+    end
+
+    style I fill:#f56565,stroke:#c53030,color:#fff
+    style L fill:#ed8936,stroke:#dd6b20,color:#fff
+    style O fill:#48bb78,stroke:#38a169,color:#fff
+    style AA fill:#f56565,stroke:#c53030,color:#fff
+    style Y fill:#9f7aea,stroke:#805ad5,color:#fff
+

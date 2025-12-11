@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lensor Capture Pipeline Diagram</title>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ 
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#4a5568',
+        primaryTextColor: '#fff',
+        primaryBorderColor: '#2d3748',
+        lineColor: '#718096',
+        secondaryColor: '#667eea',
+        tertiaryColor: '#f7fafc',
+        fontFamily: 'SF Mono, Monaco, Consolas, monospace',
+        fontSize: '14px'
+      },
+      flowchart: {
+        curve: 'basis',
+        padding: 20
+      }
+    });
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+      min-height: 100vh;
+      padding: 40px;
+      color: #e2e8f0;
+    }
+    h1 {
+      text-align: center;
+      font-weight: 600;
+      font-size: 28px;
+      margin-bottom: 10px;
+      color: #f7fafc;
+    }
+    .subtitle {
+      text-align: center;
+      color: #a0aec0;
+      margin-bottom: 40px;
+      font-size: 14px;
+    }
+    .diagram-container {
+      background: #f7fafc;
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 1400px;
+      margin: 0 auto 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .diagram-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #4a5568;
+    }
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+    .notes {
+      max-width: 800px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .notes h3 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #a0aec0;
+      margin-bottom: 16px;
+    }
+    .notes ul {
+      list-style: none;
+    }
+    .notes li {
+      padding: 8px 0;
+      padding-left: 24px;
+      position: relative;
+      font-size: 14px;
+      color: #cbd5e0;
+    }
+    .notes li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: #667eea;
+    }
+    .notes li.warning::before {
+      content: '⚠️';
+    }
+    .notes li.good::before {
+      content: '✓';
+      color: #48bb78;
+    }
+  </style>
+</head>
+<body>
+  <h1>Lensor Tab Capture Pipeline</h1>
+  <p class="subtitle">Visual reference for the screen capture → canvas display flow</p>
+
+  <!-- Main Flowchart -->
+  <div class="diagram-container">
+    <div class="diagram-title">Complete Capture Pipeline</div>
+    <pre class="mermaid">
+flowchart LR
+    subgraph USER[" "]
+        direction TB
+        A[👆 User clicks<br>extension icon]
+    end
+
+    subgraph SW["Service Worker"]
+        direction TB
+        B[chrome.action<br>.onClicked] --> C[Set active=true<br>via Crann]
+        C --> D[chrome.tabCapture<br>.getMediaStreamId]
+        D --> E[Return token]
+    end
+
+    subgraph UI["Content Script / React"]
+        direction TB
+        F[navigator.mediaDevices<br>.getUserMedia] --> G[MediaStream<br>📹 Live video feed]
+        G --> H[new ImageCapture<br>from video track]
+        H --> I[grabFrame<br>→ ImageBitmap]
+        I --> J[Crop borders<br>createImageBitmap]
+        J --> K[Close old bitmap ✓]
+        K --> L[Store in<br>React state]
+    end
+
+    subgraph RENDER["Canvas Rendering"]
+        direction TB
+        M{Fisheye<br>enabled?}
+        N[drawImage to<br>mainCanvas]
+        O[drawImage to<br>interCanvas]
+        P[WebGL shader<br>fisheyeCanvas]
+        Q[Copy to<br>mainCanvas]
+        R[getImageData<br>center pixel]
+        S[🎨 Color<br>detection]
+        
+        M -->|No| N
+        M -->|Yes| O --> P --> Q
+        N --> R
+        Q --> R
+        R --> S
+    end
+
+    A --> B
+    E --> F
+    L --> M
+
+    style A fill:#667eea,stroke:#5a67d8,color:#fff
+    style G fill:#f56565,stroke:#c53030,color:#fff
+    style I fill:#ed8936,stroke:#dd6b20,color:#fff
+    style K fill:#48bb78,stroke:#38a169,color:#fff
+    style S fill:#9f7aea,stroke:#805ad5,color:#fff
+    </pre>
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-color" style="background: #667eea"></div>
+        <span>User Action</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #f56565"></div>
+        <span>MediaStream (recording indicator)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #ed8936"></div>
+        <span>ImageBitmap (~8MB)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #48bb78"></div>
+        <span>Memory cleanup</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #9f7aea"></div>
+        <span>Output</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Memory Flow Diagram -->
+  <div class="diagram-container">
+    <div class="diagram-title">Memory Allocation During Capture Cycle</div>
+    <pre class="mermaid">
+flowchart TD
+    subgraph CAPTURE["Frame Capture"]
+        A["grabFrame()"] --> B["Raw ImageBitmap<br>🟧 ~8MB GPU memory"]
+    end
+
+    subgraph PROCESS["Processing"]
+        B --> C{"Needs<br>cropping?"}
+        C -->|Yes| D["createImageBitmap()<br>🟧 +8MB (cropped)"]
+        D --> E["sourceBitmap.close()<br>🟩 -8MB freed"]
+        C -->|No| F["Use original"]
+    end
+
+    subgraph STATE["React State"]
+        E --> G["setImageBitmap()<br>🟥 Old bitmap orphaned!"]
+        F --> G
+        G --> H["New bitmap in state<br>🟧 8MB"]
+    end
+
+    subgraph CANVAS["Canvas Drawing"]
+        H --> I["drawImage()<br>No new allocation"]
+        I --> J["Canvas pixels<br>400×400×4 = 640KB"]
+    end
+
+    style B fill:#ed8936,stroke:#dd6b20,color:#fff
+    style D fill:#ed8936,stroke:#dd6b20,color:#fff
+    style E fill:#48bb78,stroke:#38a169,color:#fff
+    style G fill:#f56565,stroke:#c53030,color:#fff
+    style H fill:#ed8936,stroke:#dd6b20,color:#fff
+    style J fill:#4299e1,stroke:#3182ce,color:#fff
+    </pre>
+  </div>
+
+  <!-- Sequence Diagram -->
+  <div class="diagram-container">
+    <div class="diagram-title">Activation Sequence</div>
+    <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    
+    participant U as 👆 User
+    participant SW as Service Worker
+    participant C as Crann State
+    participant UI as React UI
+    participant CH as Chrome APIs
+    
+    U->>SW: Click extension icon
+    activate SW
+    SW->>C: set({ active: true })
+    C-->>UI: State change notification
+    activate UI
+    
+    UI->>C: callAction('getMediaStreamId')
+    C->>SW: RPC request
+    SW->>CH: tabCapture.getMediaStreamId()
+    CH-->>SW: mediaStreamId token
+    SW-->>C: Return token
+    C-->>UI: mediaStreamId
+    
+    UI->>CH: getUserMedia({ chromeMediaSourceId })
+    Note over CH: 🔴 Recording indicator ON
+    CH-->>UI: MediaStream
+    
+    UI->>UI: new ImageCapture(track)
+    
+    rect rgb(255, 243, 224)
+        Note over UI: Hide lens before capture
+        UI->>UI: requestAnimationFrame × 2
+        UI->>UI: setTimeout(50ms)
+    end
+    
+    UI->>CH: grabFrame()
+    CH-->>UI: ImageBitmap (full tab)
+    
+    UI->>UI: Crop borders
+    UI->>UI: Close original ✅
+    UI->>UI: setImageBitmap()
+    
+    UI->>UI: drawImage to canvas
+    UI->>UI: getImageData(center)
+    UI-->>U: 🎨 Color displayed
+    
+    deactivate UI
+    deactivate SW
+    </pre>
+  </div>
+
+  <!-- Notes Section -->
+  <div class="notes">
+    <h3>Key Observations</h3>
+    <ul>
+      <li>MediaStream stays open continuously → causes persistent recording indicator</li>
+      <li class="warning">Old ImageBitmap not closed when React state is updated → potential memory leak</li>
+      <li>Full tab captured (~8MB) but only small portion displayed in 400×400 lens</li>
+      <li class="good">Original bitmap is properly closed after cropping</li>
+      <li>Fisheye path adds 2 extra canvas copies before final display</li>
+      <li>Each recapture (scroll/resize/DOM change) repeats the full capture cycle</li>
+    </ul>
+  </div>
+
+  <script>
+    // Add ability to right-click save as PNG
+    document.addEventListener('contextmenu', (e) => {
+      console.log('Tip: Use browser DevTools to screenshot individual diagrams');
+    });
+  </script>
+</body>
+</html>
+
