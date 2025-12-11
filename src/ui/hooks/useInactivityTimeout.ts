@@ -83,11 +83,7 @@ export function useInactivityTimeout(
 
     // Main timeout
     timeoutRef.current = setTimeout(() => {
-      log('Inactivity timeout expired - calling shutdown');
-      console.log(
-        '[Lensor] Inactivity timeout expired after %d minutes',
-        timeoutMs / 60000
-      );
+      log('Inactivity timeout expired');
       setIsActive(false);
       onTimeoutRef.current();
     }, timeoutMs);

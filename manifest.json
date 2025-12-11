@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lensor",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "A magnifying lens for pixel-perfect color detection and palette generation",
   "permissions": [
     "tabCapture",

@@ -39,7 +39,7 @@ const DRAWER_MARGIN = 10; // Small buffer from viewport edges
 const DRAWER_HALF_HEIGHT = DRAWER_HEIGHT / 2; // For vertical centering check on side positions
 
 // Inactivity timeout duration (20 minutes)
-const INACTIVITY_TIMEOUT_MS = 1 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 
 // Module-level state for drawer - persists across component remounts during capture
 let persistedDrawerOpen = false;
