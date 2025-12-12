@@ -29,14 +29,39 @@ import {
 import Handle from './Handle';
 import ControlDrawer, { DrawerPosition } from './ControlDrawer';
 import { debug } from '../../../lib/debug';
+import {
+  EntranceAnimationGlobalStyles,
+  HandleRevealWrapper,
+  useEntranceAnimation,
+  getAnimationMask,
+  CENTER_FADE_DURATION,
+  CENTER_FADE_DELAY
+} from './EntranceAnimation';
 
 const log = debug.ui;
 
 const CANVAS_SIZE = 400;
+const BORDER_SIZE = 60;
+const TOTAL_LENS_SIZE = CANVAS_SIZE + BORDER_SIZE; // 460px total with handle
 const DRAWER_HEIGHT = 326; // Pull tab (26px) + Panel (300px)
 const DRAWER_WIDTH = 260;
 const DRAWER_MARGIN = 10; // Small buffer from viewport edges
 const DRAWER_HALF_HEIGHT = DRAWER_HEIGHT / 2; // For vertical centering check on side positions
+
+/**
+ * Calculate the centered position for the lens on the current viewport.
+ * Returns coordinates that place the lens center at the viewport center.
+ */
+const getCenteredPosition = () => {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  // Center the lens (accounting for the full size including handle)
+  const x = Math.round((viewportWidth - CANVAS_SIZE) / 2);
+  const y = Math.round((viewportHeight - CANVAS_SIZE) / 2);
+
+  return { x, y };
+};
 
 // Inactivity timeout duration (20 minutes)
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
@@ -91,6 +116,15 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const [active] = useStateItem('active');
 
   log('Render, active: %s', active);
+
+  // Center the lens when the extension becomes active
+  useEffect(() => {
+    if (active) {
+      const centeredPos = getCenteredPosition();
+      log('Centering lens at: %o', centeredPos);
+      setLensePosition(centeredPos);
+    }
+  }, [active, setLensePosition]);
 
   const { debugMode } = useDebugMode();
   const { debugInfo, setDebugInfo } = useDebugInfo();
@@ -185,6 +219,19 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     setMaterialPalette,
     setHoveredColor
   );
+
+  // Entrance animation - triggers when canvases become visible
+  // Resets when canvasesVisible becomes false (extension closed)
+  const {
+    isAnimating: entranceAnimating,
+    isComplete: entranceComplete,
+    revealAngle
+  } = useEntranceAnimation({
+    enabled: canvasesVisible,
+    onComplete: () => {
+      log('Entrance animation complete');
+    }
+  });
 
   useEffect(() => {
     if (canvasesReady && currentImage && mainCanvasRef.current) {
@@ -300,26 +347,58 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   if (!active) return;
   if (isCapturing) return;
 
+  // Determine if we should show canvases based on entrance animation state
+  // During animation: canvases fade in after a delay
+  // After animation: canvases are fully visible
+  const showCenterContent =
+    canvasesVisible && (entranceAnimating || entranceComplete);
+  const centerContentOpacity = entranceComplete ? 1 : 0;
+
   return (
     <LenseContainer ref={containerRef} initialPosition={lensePosition}>
+      {/* Global styles for @property (CSS Houdini) */}
+      <EntranceAnimationGlobalStyles />
+
+      {/* Center content: Main canvas, grid, glass overlay */}
+      {/* These fade in after the handle animation starts */}
       <MainCanvas
         ref={mainCanvasRef}
         id="lensor-main-canvas"
         width={CANVAS_SIZE}
         height={CANVAS_SIZE}
         borderColor={hoveredColor}
-        visible={canvasesVisible}
+        visible={showCenterContent}
         shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
+        style={{
+          opacity: entranceAnimating ? 0 : centerContentOpacity,
+          animation: entranceAnimating
+            ? `lensor-fade-in ${CENTER_FADE_DURATION}ms ease-out ${CENTER_FADE_DELAY}ms forwards`
+            : undefined
+        }}
       />
       <GridCanvas
         id="lensor-grid-canvas"
         ref={gridCanvasRef}
         width={CANVAS_SIZE}
         height={CANVAS_SIZE}
-        visible={canvasesVisible}
+        visible={showCenterContent}
         shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
+        style={{
+          opacity: entranceAnimating ? 0 : centerContentOpacity,
+          animation: entranceAnimating
+            ? `lensor-fade-in ${CENTER_FADE_DURATION}ms ease-out ${CENTER_FADE_DELAY}ms forwards`
+            : undefined
+        }}
       />
-      <GlassOverlay visible={canvasesVisible} />
+      <GlassOverlay
+        visible={showCenterContent}
+        style={{
+          opacity: entranceAnimating ? 0 : centerContentOpacity,
+          animation: entranceAnimating
+            ? `lensor-fade-in ${CENTER_FADE_DURATION}ms ease-out ${CENTER_FADE_DELAY}ms forwards`
+            : undefined
+        }}
+      />
       <HiddenCanvas
         ref={fisheyeCanvasRef}
         id="lensor-fisheye-canvas"
@@ -332,32 +411,51 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         width={CANVAS_SIZE}
         height={CANVAS_SIZE}
       />
-      <Handle
-        ref={ringHandleRef}
-        id="lensor-ring-handle"
-        className="circle-ring"
-        canvasSize={CANVAS_SIZE}
-        borderSize={60}
-        contrastColor={hexToRgba(
-          convertToGrayscalePreservingFormat(
-            materialPalette?.[800] || '#000000'
-          ),
-          1
-        )}
-        contrastColor2={colorPalette[1]}
-        hoveredColor={hoveredColor}
-        textureHighlight={getSubtleTextureColor(hoveredColor, 5, 25).highlight}
-        textureHighlightBright={
-          getSubtleTextureColor(hoveredColor, 5, 25).highlightBright
+
+      {/* Handle with reveal animation */}
+      {/* Uses combined mask: ring cutout + conic reveal gradient */}
+      <HandleRevealWrapper
+        $complete={entranceComplete}
+        style={
+          entranceAnimating
+            ? {
+                mask: getAnimationMask(revealAngle),
+                WebkitMask: getAnimationMask(revealAngle),
+                maskComposite: 'intersect',
+                WebkitMaskComposite: 'source-in'
+              }
+            : undefined
         }
-        textureHighlightBrightest={
-          getSubtleTextureColor(hoveredColor, 5, 25).highlightBrightest
-        }
-        textureShadow={getSubtleTextureColor(hoveredColor, 5, 25).shadow}
-        patternName="knurling"
-        patternOpacity={0.25}
-        style={{ display: canvasesVisible ? 'block' : 'none' }}
-      />
+      >
+        <Handle
+          ref={ringHandleRef}
+          id="lensor-ring-handle"
+          className="circle-ring"
+          canvasSize={CANVAS_SIZE}
+          borderSize={60}
+          contrastColor={hexToRgba(
+            convertToGrayscalePreservingFormat(
+              materialPalette?.[800] || '#000000'
+            ),
+            1
+          )}
+          contrastColor2={colorPalette[1]}
+          hoveredColor={hoveredColor}
+          textureHighlight={
+            getSubtleTextureColor(hoveredColor, 5, 25).highlight
+          }
+          textureHighlightBright={
+            getSubtleTextureColor(hoveredColor, 5, 25).highlightBright
+          }
+          textureHighlightBrightest={
+            getSubtleTextureColor(hoveredColor, 5, 25).highlightBrightest
+          }
+          textureShadow={getSubtleTextureColor(hoveredColor, 5, 25).shadow}
+          patternName="knurling"
+          patternOpacity={0.25}
+          style={{ display: canvasesVisible ? 'block' : 'none' }}
+        />
+      </HandleRevealWrapper>
       {canvasesVisible && (
         <ControlDrawer
           canvasSize={CANVAS_SIZE}
