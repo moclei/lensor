@@ -41,11 +41,15 @@ async function handleActionButtonClick(tab: chrome.tabs.Tab) {
 }
 
 subscribe((state, changes, agentInfo) => {
-  if (!agentInfo || !agentInfo.location.tabId) {
-    console.warn('[SW] Subscribe: Agent non-existent or no tabId');
-    return;
-  }
+  // Only need agentInfo.location.tabId for sidepanel/initialized handling
+  // Service-partitioned state changes and sidepanel agents won't have tabId
+  const hasTabId = agentInfo?.location?.tabId;
+
   if ('isSidepanelShown' in changes) {
+    if (!hasTabId) {
+      log('isSidepanelShown changed but no tabId available');
+      return;
+    }
     log('isSidepanelShown changed: %s', changes.isSidepanelShown);
     if (changes.isSidepanelShown === true) {
       log('Opening sidepanel');
@@ -63,12 +67,16 @@ subscribe((state, changes, agentInfo) => {
     }
   }
   if ('initialized' in changes) {
+    if (!hasTabId) {
+      log('initialized changed but no tabId available');
+      return;
+    }
     log('Initialized changed: %s', changes.initialized);
     if (changes.initialized === true) {
       log('Activating UI');
-      const { key, state } = getAgentStateByTabId(agentInfo.location.tabId);
+      const { key, state } = getAgentStateByTabId(agentInfo!.location.tabId);
       if (!key) {
-        console.warn('[SW] No key found for tabId', agentInfo.location.tabId);
+        console.warn('[SW] No key found for tabId', agentInfo!.location.tabId);
         return;
       }
       const { active: isActive } = get(key);
