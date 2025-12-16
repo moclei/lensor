@@ -42,16 +42,15 @@ interface ControlDrawerProps {
   isOpen: boolean;
   gridOn: boolean;
   fisheyeOn: boolean;
-  autoRefresh: boolean;
   zoom: number;
   hoveredColor: string;
   colorPalette: string[];
   materialPalette: Record<number, string>;
-  // State setters
+  // Callbacks
   onToggle: () => void;
   onGridToggle: () => void;
   onFisheyeToggle: () => void;
-  onAutoRefreshToggle: () => void;
+  onManualRefresh: () => void;
   onZoomChange: (newZoom: number) => void;
 }
 
@@ -65,7 +64,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   isOpen,
   gridOn,
   fisheyeOn,
-  autoRefresh,
   zoom,
   hoveredColor,
   colorPalette,
@@ -73,7 +71,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   onToggle,
   onGridToggle,
   onFisheyeToggle,
-  onAutoRefreshToggle,
+  onManualRefresh,
   onZoomChange
 }) => {
   const [copyTooltip, setCopyTooltip] = useState<string | null>(null);
@@ -163,9 +161,9 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
             </ToggleButton>
 
             <ToggleButton
-              isActive={autoRefresh}
-              onClick={onAutoRefreshToggle}
-              title="Auto-refresh on page changes"
+              isActive={false}
+              onClick={onManualRefresh}
+              title="Refresh capture"
             >
               ↻
             </ToggleButton>

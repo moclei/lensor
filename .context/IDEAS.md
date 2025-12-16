@@ -8,8 +8,8 @@ Issues that need resolution before Chrome Web Store release:
 
 - [x] **Lens appears in recaptures** — Hide lens before taking new screenshot ✓ Fixed
 - [x] **Position resets on recapture** — Preserve lens position across recaptures ✓ Fixed
-- [ ] **Manual refresh option** — Button to manually trigger recapture
-- [ ] **Disable auto-recapture option** — Setting to turn off automatic recapturing
+- [x] **Manual refresh option** — Button to manually trigger recapture ✓ Implemented
+- [ ] **DOM mutation recapture toggle** — Setting to enable/disable DOM-based recapture (infrastructure exists but disabled, needs refinement)
 - [x] **Screen sharing indicator** — Mitigated via inactivity timeout (20min) that stops capture and hides UI. User can restart by clicking extension icon.
 - [x] **Sidepanel removal cleanup** — Sidepanel has been replaced by slide drawer UI. Remove remaining sidepanel references from code, manifest, and documentation.
 

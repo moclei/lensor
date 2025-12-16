@@ -78,8 +78,8 @@ architecture:
     library: crann
     pattern: Service Worker as hub, content scripts as agents
     partition_types:
-      Instance: Per-tab state (active, mediaStreamId, isSidepanelShown)
-      Service: Global shared state (zoom, hoveredColor, colorPalette, materialPalette)
+      Instance: Per-tab state (active, isSidepanelShown, showGrid, showFisheye, autoRefresh, zoom)
+      Service: Global shared state (hoveredColor, colorPalette, materialPalette, lensePosition)
 
 files:
   entry_points:
@@ -183,9 +183,17 @@ features:
       branch: feat/color-palettes
       description: Generates monochromatic and Material Design palettes from detected color
 
-    - name: Auto-Recapture
+    - name: Auto-Recapture (Scroll/Resize)
       status: functional
-      description: Re-captures page on scroll, resize, or DOM mutations
+      description: Always recaptures page on scroll or resize (user-initiated actions)
+
+    - name: Manual Refresh
+      status: functional
+      description: Button in slide drawer to manually trigger a new page capture
+
+    - name: Auto-Recapture (DOM Mutations)
+      status: disabled
+      description: Infrastructure exists but disabled due to edge cases; may revisit in future
 
   visual:
     - name: Grid Overlay

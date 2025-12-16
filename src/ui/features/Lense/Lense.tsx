@@ -86,7 +86,8 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
 
   const [gridOn, setGridOn] = useStateItem('showGrid');
   const [fisheyeOn, setFisheyeOn] = useStateItem('showFisheye');
-  const [autoRefresh, setAutoRefresh] = useStateItem('autoRefresh');
+  // autoRefresh is kept for potential future use but not exposed in UI
+  // DOM mutation recapture is effectively disabled
   const [zoom, setZoom] = useStateItem('zoom');
   const [active] = useStateItem('active');
 
@@ -132,12 +133,20 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   });
 
   const { lastChangeTimestamp, lastScrollPosition } = usePageObservers(
-    () => {
-      if (active && !isCapturing && autoRefresh) {
-        log('Page change detected, recapturing');
-        captureFrame();
-        // Reset inactivity timer on page interaction (scroll, resize, DOM changes)
-        resetActivity();
+    {
+      // Scroll and resize recapture: always on (user-initiated actions)
+      onScrollOrResizeChange: () => {
+        if (active && !isCapturing) {
+          log('Scroll/resize detected, recapturing');
+          captureFrame();
+          resetActivity();
+        }
+      },
+      // DOM mutation recapture: disabled for now (too many edge cases)
+      // Keeping the infrastructure for potential future use
+      onMutationChange: () => {
+        // Intentionally disabled - DOM mutations don't trigger recapture
+        // Users can manually refresh if needed
       }
     },
     {
@@ -222,10 +231,13 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     resetActivity();
   }, [fisheyeOn, setFisheyeOn, resetActivity]);
 
-  const handleAutoRefreshToggle = useCallback(() => {
-    setAutoRefresh(!autoRefresh);
-    resetActivity();
-  }, [autoRefresh, setAutoRefresh, resetActivity]);
+  const handleManualRefresh = useCallback(() => {
+    if (active && !isCapturing) {
+      log('Manual refresh triggered');
+      captureFrame();
+      resetActivity();
+    }
+  }, [active, isCapturing, captureFrame, resetActivity]);
 
   const handleZoomChange = useCallback(
     (newZoom: number) => {
@@ -366,7 +378,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
           isOpen={drawerOpen}
           gridOn={gridOn}
           fisheyeOn={fisheyeOn}
-          autoRefresh={autoRefresh}
           zoom={zoom}
           hoveredColor={hoveredColor}
           colorPalette={colorPalette}
@@ -374,7 +385,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
           onToggle={handleDrawerToggle}
           onGridToggle={handleGridToggle}
           onFisheyeToggle={handleFisheyeToggle}
-          onAutoRefreshToggle={handleAutoRefreshToggle}
+          onManualRefresh={handleManualRefresh}
           onZoomChange={handleZoomChange}
         />
       )}
