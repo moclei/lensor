@@ -51,15 +51,29 @@ interface UsePageObserversOptions {
   threshold?: number;
 }
 
+interface UsePageObserversCallbacks {
+  /**
+   * Called when scroll or resize changes exceed their thresholds.
+   * These are user-initiated actions that clearly change the visible page.
+   */
+  onScrollOrResizeChange?: () => void;
+  /**
+   * Called when DOM mutations exceed the threshold.
+   * These may or may not represent visible changes.
+   */
+  onMutationChange?: () => void;
+}
+
 interface UsePageObserversResult {
   lastChangeTimestamp: number | null;
   lastScrollPosition: { x: number; y: number } | null;
 }
 
 export function usePageObservers(
-  onSignificantChange: () => void,
+  callbacks: UsePageObserversCallbacks,
   options: UsePageObserversOptions = {}
 ): UsePageObserversResult {
+  const { onScrollOrResizeChange, onMutationChange } = callbacks;
   const defaultDebounceTime = 300;
   const defaultThreshold = 10;
 
@@ -230,8 +244,8 @@ export function usePageObservers(
 
       // First update the timestamp
       setLastChangeTimestamp(Date.now());
-      // Then trigger the callback
-      onSignificantChange();
+      // Then trigger the callback (scroll/resize category)
+      onScrollOrResizeChange?.();
       // Reset the score with a small delay to ensure effects run in proper sequence
       setTimeout(() => {
         setScrollChangeScore(0);
@@ -241,7 +255,7 @@ export function usePageObservers(
         }, 50);
       }, 0);
     }
-  }, [debouncedScrollScore, scrollThreshold, onSignificantChange]);
+  }, [debouncedScrollScore, scrollThreshold, onScrollOrResizeChange]);
 
   // Process debounced mutation changes
   useEffect(() => {
@@ -254,7 +268,8 @@ export function usePageObservers(
       isProcessingMutationRef.current = true;
 
       setLastChangeTimestamp(Date.now());
-      onSignificantChange();
+      // Trigger the mutation-specific callback
+      onMutationChange?.();
 
       // Reset the score with a small delay to ensure effects run in proper sequence
       setTimeout(() => {
@@ -265,7 +280,7 @@ export function usePageObservers(
         }, 50);
       }, 0);
     }
-  }, [debouncedMutationScore, mutationThreshold, onSignificantChange]);
+  }, [debouncedMutationScore, mutationThreshold, onMutationChange]);
 
   // Process debounced resize changes
   useEffect(() => {
@@ -278,7 +293,8 @@ export function usePageObservers(
       isProcessingResizeRef.current = true;
 
       setLastChangeTimestamp(Date.now());
-      onSignificantChange();
+      // Trigger the scroll/resize callback (resize is user-initiated like scroll)
+      onScrollOrResizeChange?.();
 
       // Reset the score with a small delay to ensure effects run in proper sequence
       setTimeout(() => {
@@ -289,7 +305,7 @@ export function usePageObservers(
         }, 50);
       }, 0);
     }
-  }, [debouncedResizeScore, resizeThreshold, onSignificantChange]);
+  }, [debouncedResizeScore, resizeThreshold, onScrollOrResizeChange]);
 
   return {
     lastChangeTimestamp,

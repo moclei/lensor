@@ -81,7 +81,8 @@ Key state items:
 - **Zoom Control**: Adjustable magnification (0.5x–16x)
 - **Color Detection**: Detects RGB color at lens center
 - **Color Palettes**: Generates monochromatic and Material Design palettes from detected color
-- **Auto-Recapture**: Re-captures page on scroll, resize, or significant DOM changes
+- **Auto-Recapture**: Re-captures page automatically on scroll and resize
+- **Manual Refresh**: Button in slide drawer to manually trigger a new capture
 - **Inactivity Timeout**: Automatically shuts down after 20 minutes of inactivity to stop screen capture
 
 ### Visual Options
@@ -96,6 +97,7 @@ A slide-out drawer UI attached to the lens provides quick access to settings:
 
 - Toggle grid overlay
 - Toggle fisheye effect
+- Manual refresh button (re-capture the page)
 - Adjust zoom level
 - View current color and generated palettes
 
