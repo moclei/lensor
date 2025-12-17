@@ -39,19 +39,44 @@ export function useMediaCapture(
   const { autoCapture = true } = options;
 
   const [imageBitmap, setImageBitmap] = useState<ImageBitmap | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [isCapturingLocal, setIsCapturingLocal] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // Sync isCapturing to Crann state (for components that need to know capture is in progress)
+  const [, setIsCapturingState] = useStateItem('isCapturing');
+  // Separate state for flash animation (triggers before capture to avoid flash in screenshot)
+  const [, setIsFlashing] = useStateItem('isFlashing');
 
   // Track the current bitmap so we can close it when replaced
   const currentBitmapRef = useRef<ImageBitmap | null>(null);
 
   const [active] = useStateItem('active');
 
+  // Helper to set both local and shared state
+  const setIsCapturing = (value: boolean) => {
+    setIsCapturingLocal(value);
+    setIsCapturingState(value);
+  };
+
+  // Time to wait for flash animation to fade before capturing (ms)
+  // The full-screen overlay fades in 200ms, so 250ms ensures it's completely gone
+  const FLASH_FADE_DELAY_MS = 250;
+
   // Capture a frame using captureVisibleTab
   const captureFrame = useCallback(async () => {
     log('Capturing frame via captureVisibleTab');
-    setIsCapturing(true);
     setError(null);
+
+    // Step 1: Trigger flash animation (visual feedback for user)
+    setIsFlashing(true);
+
+    // Step 2: Wait for flash to fade before capturing
+    // This ensures the flash effect doesn't appear in the screenshot
+    await new Promise((resolve) => setTimeout(resolve, FLASH_FADE_DELAY_MS));
+
+    // Step 3: Clear flash state and hide lens for capture
+    setIsFlashing(false);
+    setIsCapturing(true);
 
     // Wait for React to re-render and browser to paint (lens hidden)
     await new Promise<void>((resolve) => {
@@ -101,7 +126,7 @@ export function useMediaCapture(
     } finally {
       setIsCapturing(false);
     }
-  }, [callAction]);
+  }, [callAction, setIsFlashing]);
 
   // Auto-capture when active becomes true
   useEffect(() => {
@@ -130,7 +155,7 @@ export function useMediaCapture(
 
   return {
     imageBitmap,
-    isCapturing,
+    isCapturing: isCapturingLocal,
     captureFrame,
     error
   };

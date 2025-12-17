@@ -59,6 +59,14 @@ export const LensorStateConfig = {
     default: { x: 0, y: 0 },
     partition: Partition.Service
   },
+  isCapturing: {
+    default: false,
+    partition: Partition.Instance
+  },
+  isFlashing: {
+    default: false,
+    partition: Partition.Instance
+  },
   // DEPRECATED: getMediaStreamId is no longer used with captureVisibleTab approach
   // Keeping for now in case we need to revert to MediaStream approach
   // getMediaStreamId: {
