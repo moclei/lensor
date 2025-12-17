@@ -19,7 +19,6 @@ export interface RingHandleStyleProps {
 }
 
 export const StyledRingHandle = styled.div<RingHandleStyleProps>`
-  z-index: 5;
   position: absolute;
   width: ${(props) => props.canvasSize + props.borderSize}px;
   height: ${(props) => props.canvasSize + props.borderSize}px;

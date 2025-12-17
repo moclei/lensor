@@ -18,7 +18,6 @@ const MainCanvas = styled.canvas<{
   visible: boolean;
 }>`
   position: absolute;
-  z-index: 6;
   border-radius: 50%;
   width: 400px;
   height: 400px;
@@ -34,7 +33,6 @@ const GridCanvas = styled.canvas<{
   visible: boolean;
 }>`
   position: absolute;
-  z-index: 10;
   border-radius: 50%;
   overflow: hidden;
   box-shadow: ${(props) => props.shadowColor} 0px 0px 4px 6px inset;
@@ -48,7 +46,6 @@ const HiddenCanvas = styled.canvas`
 /* Glass effect overlay - sits on top of canvas to add lens realism */
 const GlassOverlay = styled.div<{ visible: boolean }>`
   position: absolute;
-  z-index: 9;
   width: 400px;
   height: 400px;
   border-radius: 50%;

@@ -203,6 +203,15 @@ Implementing color palette generation from the detected pixel color:
 
 - **Sidepanel removal**: The `src/sidepanel/` directory and related manifest/build references should be removed. The sidepanel has been replaced by the slide drawer UI integrated into the main lens component.
 
+## Documentation
+
+Technical documentation lives in `docs/`:
+
+| Path | Purpose |
+|------|---------|
+| `docs/animation/` | Animation implementation references |
+| `docs/animation/stacking_inventory.md` | UI element layering and visibility audit |
+
 ## Ignored Directories
 
 - `scratch/` — Experimental scripts, not part of the project

@@ -333,36 +333,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
 
   return (
     <LenseContainer ref={containerRef} initialPosition={lensePosition}>
-      <MainCanvas
-        ref={mainCanvasRef}
-        id="lensor-main-canvas"
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        borderColor={hoveredColor}
-        visible={canvasesVisible}
-        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
-      />
-      <GridCanvas
-        id="lensor-grid-canvas"
-        ref={gridCanvasRef}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        visible={canvasesVisible}
-        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
-      />
-      <GlassOverlay visible={canvasesVisible} />
-      <HiddenCanvas
-        ref={fisheyeCanvasRef}
-        id="lensor-fisheye-canvas"
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-      />
-      <HiddenCanvas
-        ref={interCanvasRef}
-        id="lensor-inter-canvas"
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-      />
+      {/* DOM order matches visual stacking: Handle (bottom) → MainCanvas → GlassOverlay → GridCanvas (top) */}
       <Handle
         ref={ringHandleRef}
         id="lensor-ring-handle"
@@ -388,6 +359,36 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         patternName="knurling"
         patternOpacity={0.25}
         style={{ display: canvasesVisible ? 'block' : 'none' }}
+      />
+      <MainCanvas
+        ref={mainCanvasRef}
+        id="lensor-main-canvas"
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+        borderColor={hoveredColor}
+        visible={canvasesVisible}
+        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
+      />
+      <GlassOverlay visible={canvasesVisible} />
+      <GridCanvas
+        id="lensor-grid-canvas"
+        ref={gridCanvasRef}
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+        visible={canvasesVisible}
+        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
+      />
+      <HiddenCanvas
+        ref={fisheyeCanvasRef}
+        id="lensor-fisheye-canvas"
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+      />
+      <HiddenCanvas
+        ref={interCanvasRef}
+        id="lensor-inter-canvas"
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
       />
       {canvasesVisible && (
         <ControlDrawer

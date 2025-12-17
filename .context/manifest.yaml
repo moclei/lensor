@@ -17,6 +17,11 @@ context_docs:
   manifest: .context/manifest.yaml
   ideas: .context/IDEAS.md
 
+documentation:
+  animation:
+    stacking_inventory: docs/animation/stacking_inventory.md
+    description: UI element layering and visibility reference for animation work
+
 tech_stack:
   language: TypeScript
   runtime: Browser (Chrome Extension)
