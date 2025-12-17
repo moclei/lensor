@@ -1,19 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Lensor",
-  "version": "1.0.21",
+  "version": "1.1.0",
   "description": "A magnifying lens for pixel-perfect color detection and palette generation",
-  "permissions": [
-    "activeTab",
-    "storage",
-    "scripting",
-    "sidePanel"
-  ],
+  "permissions": ["activeTab", "storage", "scripting"],
   "background": {
     "service_worker": "service-workers/service-worker.js"
-  },
-  "side_panel": {
-    "default_path": "sidepanel/sidepanel.html"
   },
   "icons": {
     "16": "images/lensor-icon-16.png",
