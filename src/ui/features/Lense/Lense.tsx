@@ -41,6 +41,9 @@ const DRAWER_HALF_HEIGHT = DRAWER_HEIGHT / 2; // For vertical centering check on
 // Inactivity timeout duration (20 minutes)
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 
+// Minimum time between captures (Chrome limits to 2/second, so 600ms is safe)
+const CAPTURE_COOLDOWN_MS = 600;
+
 // Module-level state for drawer - persists across component remounts during capture
 let persistedDrawerOpen = false;
 
@@ -69,6 +72,9 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const infoScrollRef = useRef<HTMLDivElement>(null);
 
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Track last capture time to enforce rate limiting (Chrome caps at 2/second)
+  const lastCaptureTimeRef = useRef<number>(0);
 
   // Drawer state - uses module-level variable to persist through capture cycles
   const [drawerOpen, setDrawerOpenState] = useState(persistedDrawerOpen);
@@ -136,8 +142,17 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     {
       // Scroll and resize recapture: always on (user-initiated actions)
       onScrollOrResizeChange: () => {
-        if (active && !isCapturing) {
+        const now = Date.now();
+        const timeSinceLastCapture = now - lastCaptureTimeRef.current;
+
+        // Enforce cooldown to avoid hitting Chrome's rate limit (2 captures/second)
+        if (
+          active &&
+          !isCapturing &&
+          timeSinceLastCapture >= CAPTURE_COOLDOWN_MS
+        ) {
           log('Scroll/resize detected, recapturing');
+          lastCaptureTimeRef.current = now;
           captureFrame();
           resetActivity();
         }
@@ -232,8 +247,12 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   }, [fisheyeOn, setFisheyeOn, resetActivity]);
 
   const handleManualRefresh = useCallback(() => {
-    if (active && !isCapturing) {
+    const now = Date.now();
+    const timeSinceLastCapture = now - lastCaptureTimeRef.current;
+
+    if (active && !isCapturing && timeSinceLastCapture >= CAPTURE_COOLDOWN_MS) {
       log('Manual refresh triggered');
+      lastCaptureTimeRef.current = now;
       captureFrame();
       resetActivity();
     }

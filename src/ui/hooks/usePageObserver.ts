@@ -200,10 +200,15 @@ export function usePageObservers(
   }, [viewportSize]);
 
   // Set up scroll listener
+  // Use document with capture:true to catch scroll events from any scrollable container
+  // (not just window scroll - many SPAs like Pinterest use scrollable divs)
   useEffect(() => {
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    document.addEventListener('scroll', handleScroll, {
+      passive: true,
+      capture: true
+    });
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll, { capture: true });
     };
   }, [handleScroll]);
 

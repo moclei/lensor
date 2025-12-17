@@ -3,6 +3,7 @@ import { StyleSheetManager } from 'styled-components';
 import React from 'react';
 import './index.css';
 import Lense from './features/Lense/Lense';
+import CaptureFlash from './features/CaptureFlash/CaptureFlash';
 import { connect } from 'crann';
 import { LensorStateConfig } from './state-config';
 import { debug } from '../lib/debug';
@@ -154,7 +155,10 @@ function initializeReact() {
     const root = createRoot(uiRoot);
     root.render(
       <StyleSheetManager target={styleSlot}>
-        <Lense onStop={handleLensorStop} onClose={handleLensorClose} />
+        <>
+          <CaptureFlash />
+          <Lense onStop={handleLensorStop} onClose={handleLensorClose} />
+        </>
       </StyleSheetManager>
     );
   }
