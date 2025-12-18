@@ -27,9 +27,26 @@ export const StyledRingHandle = styled.div<RingHandleStyleProps>`
   border-radius: 50%;
   cursor: grab;
   overflow: hidden;
-  display: block;
-  pointer-events: auto;
   background-color: transparent;
+
+  /* Visibility controlled via opacity for animation capability */
+  opacity: ${(props) => (props.visible ? 1 : 0)};
+  pointer-events: ${(props) => (props.visible ? 'auto' : 'none')};
+  transition: opacity 0.2s ease-out;
+
+  /* Clip out the center to create a ring shape - the center is covered by Lenses anyway,
+     but this ensures the Handle never accidentally renders content in the center
+     (e.g., during animations before Lenses appear) */
+  mask: radial-gradient(
+    circle at center,
+    transparent ${(props) => props.canvasSize / 2}px,
+    black ${(props) => props.canvasSize / 2}px
+  );
+  -webkit-mask: radial-gradient(
+    circle at center,
+    transparent ${(props) => props.canvasSize / 2}px,
+    black ${(props) => props.canvasSize / 2}px
+  );
 
   /* Solid base color layer (hovered pixel color) with raised/skeuomorphic edges */
   &::before {
@@ -143,6 +160,7 @@ export const Handle = forwardRef<HTMLDivElement, RingHandleProps>(
         style={style}
         canvasSize={canvasSize}
         borderSize={borderSize}
+        visible={visible}
         contrastColor={contrastColor}
         contrastColor2={contrastColor2}
         hoveredColor={hoveredColor}

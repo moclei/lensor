@@ -340,6 +340,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         className="circle-ring"
         canvasSize={CANVAS_SIZE}
         borderSize={60}
+        visible={canvasesVisible}
         contrastColor={hexToRgba(
           convertToGrayscalePreservingFormat(
             materialPalette?.[800] || '#000000'
@@ -358,7 +359,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         textureShadow={getSubtleTextureColor(hoveredColor, 5, 25).shadow}
         patternName="knurling"
         patternOpacity={0.25}
-        style={{ display: canvasesVisible ? 'block' : 'none' }}
       />
       <MainCanvas
         ref={mainCanvasRef}
@@ -390,25 +390,24 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         width={CANVAS_SIZE}
         height={CANVAS_SIZE}
       />
-      {canvasesVisible && (
-        <ControlDrawer
-          canvasSize={CANVAS_SIZE}
-          accentColor={materialPalette?.[500] || hoveredColor}
-          position={drawerPosition}
-          isOpen={drawerOpen}
-          gridOn={gridOn}
-          fisheyeOn={fisheyeOn}
-          zoom={zoom}
-          hoveredColor={hoveredColor}
-          colorPalette={colorPalette}
-          materialPalette={materialPalette}
-          onToggle={handleDrawerToggle}
-          onGridToggle={handleGridToggle}
-          onFisheyeToggle={handleFisheyeToggle}
-          onManualRefresh={handleManualRefresh}
-          onZoomChange={handleZoomChange}
-        />
-      )}
+      <ControlDrawer
+        canvasSize={CANVAS_SIZE}
+        accentColor={materialPalette?.[500] || hoveredColor}
+        position={drawerPosition}
+        visible={canvasesVisible}
+        isOpen={drawerOpen}
+        gridOn={gridOn}
+        fisheyeOn={fisheyeOn}
+        zoom={zoom}
+        hoveredColor={hoveredColor}
+        colorPalette={colorPalette}
+        materialPalette={materialPalette}
+        onToggle={handleDrawerToggle}
+        onGridToggle={handleGridToggle}
+        onFisheyeToggle={handleFisheyeToggle}
+        onManualRefresh={handleManualRefresh}
+        onZoomChange={handleZoomChange}
+      />
       {debugMode && (
         <DebugOverlay
           imageBitmap={currentImage}
