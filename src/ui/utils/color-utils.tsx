@@ -164,7 +164,7 @@ export const getGridContrastColor = (color: string): string => {
 };
 
 // Convert RGB to HSL
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+export function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   r /= 255;
   g /= 255;
   b /= 255;

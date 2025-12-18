@@ -1,9 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Lensor",
-  "version": "1.1.1",
+  "version": "1.1.10",
   "description": "A magnifying lens for pixel-perfect color detection and palette generation",
-  "permissions": ["activeTab", "storage", "scripting"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
   "background": {
     "service_worker": "service-workers/service-worker.js"
   },

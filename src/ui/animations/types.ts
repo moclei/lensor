@@ -41,3 +41,17 @@ export function getAnimationStyle(
   };
 }
 
+/**
+ * Helper that returns instant visibility without animations
+ * Used when animations are disabled in settings
+ */
+export function noAnimationStyle(
+  animation: ElementAnimation,
+  visible: boolean
+): CSSProperties {
+  return {
+    ...(visible ? animation.visible : animation.hidden),
+    transition: 'none',
+  };
+}
+

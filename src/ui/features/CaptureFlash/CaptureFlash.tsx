@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { useLensorState } from '../../hooks/useLensorState';
+import { useSettings } from '../../../settings/useSettings';
 
 const CANVAS_SIZE = 400;
 const ANIMATION_DURATION_MS = 400;
@@ -132,6 +133,7 @@ const CaptureFlash: React.FC = () => {
   const { useStateItem } = useLensorState();
   const [isFlashing] = useStateItem('isFlashing');
   const [lensePosition] = useStateItem('lensePosition');
+  const { settings } = useSettings();
   
   const [isAnimating, setIsAnimating] = useState(false);
   const [pulsePosition, setPulsePosition] = useState({ x: 0, y: 0 });
@@ -168,8 +170,8 @@ const CaptureFlash: React.FC = () => {
     };
   }, [isFlashing, lensePosition]);
   
-  // Don't render anything if not animating (save DOM nodes)
-  if (!isAnimating) return null;
+  // Don't render anything if not animating or flash is disabled in settings
+  if (!isAnimating || !settings.flashEffectEnabled) return null;
   
   return (
     <FlashContainer>

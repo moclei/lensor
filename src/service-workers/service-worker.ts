@@ -139,6 +139,13 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 
 chrome.runtime.onMessage.addListener(async (message) => {
   log('Message received: %o', message);
+  
+  if (message.type === 'openSettings') {
+    log('Opening settings page');
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('settings/settings.html')
+    });
+  }
 });
 
 chrome.runtime.onStartup.addListener(() => {

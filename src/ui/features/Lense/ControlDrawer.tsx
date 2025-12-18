@@ -19,9 +19,14 @@ import {
   CurrentColorHex,
   CurrentColorLabel,
   CurrentColorInfo,
+  SettingsButton,
+  SaveColorButton,
   DrawerPosition
 } from './ControlDrawer.styles';
-import { parseRgbColor, rgbToHex } from '@/ui/utils/color-utils';
+import { parseRgbColor, rgbToHex, rgbToHsl } from '@/ui/utils/color-utils';
+import { useSettings } from '../../../settings/useSettings';
+import { ColorCopyFormat } from '../../../settings/types';
+import { useSavedColors, colorToHex } from '../../../settings/savedColors';
 
 // Re-export the type for consumers
 export type { DrawerPosition };
@@ -32,6 +37,39 @@ function rgbStringToHex(rgbStr: string): string {
   const rgb = parseRgbColor(rgbStr);
   if (!rgb) return '#000000';
   return rgbToHex(rgb.r, rgb.g, rgb.b);
+}
+
+// Helper to format color based on user preference
+function formatColor(rgbStr: string, format: ColorCopyFormat): string {
+  // Parse the rgb string
+  let r = 0, g = 0, b = 0;
+  
+  if (rgbStr.startsWith('#')) {
+    const hex = rgbStr.slice(1);
+    r = parseInt(hex.slice(0, 2), 16);
+    g = parseInt(hex.slice(2, 4), 16);
+    b = parseInt(hex.slice(4, 6), 16);
+  } else {
+    const rgb = parseRgbColor(rgbStr);
+    if (rgb) {
+      r = rgb.r;
+      g = rgb.g;
+      b = rgb.b;
+    }
+  }
+
+  switch (format) {
+    case 'hex':
+      return rgbToHex(r, g, b).toUpperCase();
+    case 'rgb':
+      return `rgb(${r}, ${g}, ${b})`;
+    case 'hsl': {
+      const [h, s, l] = rgbToHsl(r, g, b);
+      return `hsl(${Math.round(h)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
+    }
+    default:
+      return rgbToHex(r, g, b).toUpperCase();
+  }
 }
 
 interface ControlDrawerProps {
@@ -79,6 +117,24 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   onZoomChange
 }) => {
   const [copyTooltip, setCopyTooltip] = useState<string | null>(null);
+  const [saveTooltip, setSaveTooltip] = useState<string | null>(null);
+  const { settings } = useSettings();
+  const { savedColors, saveColor } = useSavedColors();
+
+  // Check if current color is already saved
+  const isColorSaved = savedColors.some(
+    (c) => colorToHex(c.color) === colorToHex(hoveredColor)
+  );
+
+  const handleSaveColor = useCallback(() => {
+    if (isColorSaved) {
+      setSaveTooltip('Already saved');
+    } else {
+      saveColor(hoveredColor);
+      setSaveTooltip('Saved!');
+    }
+    setTimeout(() => setSaveTooltip(null), 1500);
+  }, [hoveredColor, isColorSaved, saveColor]);
 
   const handleZoomIn = useCallback(() => {
     if (zoom < MAX_ZOOM) {
@@ -94,14 +150,18 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
 
   const copyToClipboard = useCallback(async (color: string) => {
     try {
-      // Convert rgb to hex if needed
-      const hexColor = rgbStringToHex(color);
-      await navigator.clipboard.writeText(hexColor.toUpperCase());
-      setCopyTooltip(hexColor.toUpperCase());
+      // Format color based on user preference
+      const formattedColor = formatColor(color, settings.colorCopyFormat);
+      await navigator.clipboard.writeText(formattedColor);
+      setCopyTooltip(formattedColor);
       setTimeout(() => setCopyTooltip(null), 1500);
     } catch (err) {
       console.error('Failed to copy color:', err);
     }
+  }, [settings.colorCopyFormat]);
+
+  const openSettings = useCallback(() => {
+    chrome.runtime.sendMessage({ type: 'openSettings' });
   }, []);
 
   // Convert hovered color to hex for display
@@ -144,6 +204,19 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
                 {hexColor.toUpperCase()}
               </CurrentColorHex>
             </CurrentColorInfo>
+            <SaveColorButton
+              onClick={handleSaveColor}
+              $saved={isColorSaved}
+              title={isColorSaved ? 'Color saved' : 'Save color'}
+            >
+              {isColorSaved ? '♥' : '♡'}
+            </SaveColorButton>
+            <SettingsButton
+              onClick={openSettings}
+              title="Open settings"
+            >
+              ⚙
+            </SettingsButton>
           </CurrentColorSection>
 
           {/* Toggle controls row */}
@@ -223,6 +296,11 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
       {/* Copy tooltip */}
       {copyTooltip && (
         <CopyTooltip visible={!!copyTooltip}>Copied {copyTooltip}</CopyTooltip>
+      )}
+      
+      {/* Save tooltip */}
+      {saveTooltip && (
+        <CopyTooltip visible={!!saveTooltip}>{saveTooltip}</CopyTooltip>
       )}
     </DrawerContainer>
   );

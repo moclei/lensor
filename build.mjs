@@ -63,6 +63,26 @@ const build = () => {
         },
     }).catch(() => process.exit(1));
 
+    // Build settings page
+    esbuild.build({
+        entryPoints: ['./src/settings/index.tsx'],
+        outfile: 'dist/settings/index.js',
+        bundle: true,
+        minify: true,
+        sourcemap: true,
+        target: ['chrome58', 'firefox57'],
+        loader: { '.ts': 'ts', '.tsx': 'tsx' },
+        define: {
+          'process.env.NODE_ENV': '"production"'
+        },
+        alias: {
+          '@': './src',
+          '@ui': './src/ui',
+          '@features': './src/ui/features',
+          '@utils': './src/ui/utils',
+        },
+    }).catch(() => process.exit(1));
+
     // Copy assets
     assets.forEach(assetDir => {
         fs.readdirSync(assetDir).forEach(file => {
@@ -87,6 +107,15 @@ const build = () => {
                 fs.copyFileSync(`${srcDir}/sidepanel/${file}`, `${distDir}/sidepanel/${file}`);
             }
         });
+
+    // Copy settings assets
+    const settingsDir = './src/settings';
+    ensureDirExists(path.join(distDir, 'settings'));
+    fs.readdirSync(settingsDir).forEach(file => {
+        if (file.endsWith('.html')) {
+            fs.copyFileSync(`${settingsDir}/${file}`, `${distDir}/settings/${file}`);
+        }
+    });
 
     //triggerKeyboardMaestroMacro();
     copyManifest();
