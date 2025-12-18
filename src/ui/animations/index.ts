@@ -13,7 +13,7 @@
  * 3. Set ACTIVE_PRESET_NAME to test it
  */
 
-import { AnimationPreset, ElementAnimation, getAnimationStyle } from './types';
+import { AnimationPreset, ElementAnimation, getAnimationStyle, noAnimationStyle } from './types';
 import { fadeScale } from './presets/fade-scale';
 
 // ============================================
@@ -47,5 +47,5 @@ export const activePreset: AnimationPreset = PRESETS[ACTIVE_PRESET_NAME] || fade
 export const availablePresets = PRESETS;
 
 /** Re-export types and helpers */
-export { AnimationPreset, ElementAnimation, getAnimationStyle };
+export { AnimationPreset, ElementAnimation, getAnimationStyle, noAnimationStyle };
 

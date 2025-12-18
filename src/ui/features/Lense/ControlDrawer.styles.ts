@@ -480,3 +480,53 @@ export const CurrentColorInfo = styled.div`
   display: flex;
   flex-direction: column;
 `;
+
+// Small icon button base style
+const IconButton = styled.button`
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &:focus {
+    outline: none;
+  }
+`;
+
+// Settings button in the drawer header
+export const SettingsButton = styled(IconButton)`
+  margin-left: auto;
+`;
+
+// Save color button
+export const SaveColorButton = styled(IconButton)<{ $saved?: boolean }>`
+  color: ${(props) =>
+    props.$saved ? '#f472b6' : 'rgba(255, 255, 255, 0.5)'};
+  border-color: ${(props) =>
+    props.$saved ? 'rgba(244, 114, 182, 0.4)' : 'rgba(255, 255, 255, 0.15)'};
+  
+  &:hover {
+    color: #f472b6;
+    border-color: rgba(244, 114, 182, 0.5);
+    background: rgba(244, 114, 182, 0.1);
+  }
+`;

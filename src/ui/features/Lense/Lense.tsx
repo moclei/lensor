@@ -29,7 +29,12 @@ import {
 import Handle from './Handle';
 import ControlDrawer, { DrawerPosition } from './ControlDrawer';
 import { debug } from '../../../lib/debug';
-import { activePreset, getAnimationStyle } from '@/ui/animations';
+import {
+  activePreset,
+  getAnimationStyle,
+  noAnimationStyle
+} from '@/ui/animations';
+import { useSettings } from '../../../settings/useSettings';
 
 const log = debug.ui;
 
@@ -38,9 +43,6 @@ const DRAWER_HEIGHT = 326; // Pull tab (26px) + Panel (300px)
 const DRAWER_WIDTH = 260;
 const DRAWER_MARGIN = 10; // Small buffer from viewport edges
 const DRAWER_HALF_HEIGHT = DRAWER_HEIGHT / 2; // For vertical centering check on side positions
-
-// Inactivity timeout duration (20 minutes)
-const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
 
 // Minimum time between captures (Chrome limits to 2/second, so 600ms is safe)
 const CAPTURE_COOLDOWN_MS = 600;
@@ -77,6 +79,9 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   // Track last capture time to enforce rate limiting (Chrome caps at 2/second)
   const lastCaptureTimeRef = useRef<number>(0);
 
+  // Track if defaults have been applied (only apply once per session)
+  const defaultsAppliedRef = useRef(false);
+
   // Drawer state - uses module-level variable to persist through capture cycles
   const [drawerOpen, setDrawerOpenState] = useState(persistedDrawerOpen);
   const setDrawerOpen = useCallback((value: boolean) => {
@@ -84,8 +89,31 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     setDrawerOpenState(value);
   }, []);
 
+  // Load user settings
+  const { settings, isLoading: settingsLoading } = useSettings();
+
   const { useStateItem } = useLensorState();
   const [lensePosition, setLensePosition] = useStateItem('lensePosition');
+
+  // Calculate initial position if at default (0,0)
+  // Centered horizontally, positioned near top of viewport
+  const initialPosition = React.useMemo(() => {
+    if (lensePosition.x === 0 && lensePosition.y === 0) {
+      const centeredX = (window.innerWidth - CANVAS_SIZE) / 2;
+      const topY = window.innerHeight * 0.1; // 10% from top
+      return { x: centeredX, y: topY };
+    }
+    return lensePosition;
+  }, [lensePosition]);
+
+  // Save the initial position to state on first render if it was calculated
+  useEffect(() => {
+    if (lensePosition.x === 0 && lensePosition.y === 0) {
+      const centeredX = (window.innerWidth - CANVAS_SIZE) / 2;
+      const topY = window.innerHeight * 0.1; // 10% from top
+      setLensePosition({ x: centeredX, y: topY });
+    }
+  }, []); // Only run once on mount
 
   const [colorPalette, setColorPalette] = useStateItem('colorPalette');
   const [materialPalette, setMaterialPalette] = useStateItem('materialPalette');
@@ -98,16 +126,32 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const [zoom, setZoom] = useStateItem('zoom');
   const [active] = useStateItem('active');
 
+  // Apply default settings from user preferences on first activation
+  useEffect(() => {
+    if (active && !defaultsAppliedRef.current && !settingsLoading) {
+      defaultsAppliedRef.current = true;
+      setZoom(settings.defaultZoom);
+      setGridOn(settings.defaultGrid);
+      setFisheyeOn(settings.defaultFisheye);
+    }
+  }, [active, settings, settingsLoading, setZoom, setGridOn, setFisheyeOn]);
+
   log('Render, active: %s', active);
 
   const { debugMode } = useDebugMode();
   const { debugInfo, setDebugInfo } = useDebugInfo();
 
+  // Calculate inactivity timeout from settings (0 = disabled)
+  const inactivityTimeoutMs =
+    settings.inactivityTimeoutMinutes > 0
+      ? settings.inactivityTimeoutMinutes * 60 * 1000
+      : 0;
+
   // Inactivity timeout - shuts down extension after period of no activity
   const { resetActivity } = useInactivityTimeout({
-    timeoutMs: INACTIVITY_TIMEOUT_MS,
+    timeoutMs: inactivityTimeoutMs,
     onTimeout: shutdownLensor,
-    enabled: active
+    enabled: active && inactivityTimeoutMs > 0
   });
 
   const {
@@ -200,7 +244,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
       // Reset inactivity timer on drag
       resetActivity();
     },
-    initialPosition: lensePosition,
+    initialPosition,
     onDragEnd: setLensePosition,
     borderWidth: 0
   });
@@ -329,6 +373,16 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     drawCrosshairs({ color: gridContrastColor });
   }, [gridOn, scale, zoom, drawGrid, drawCrosshairs, gridContrastColor]);
 
+  // Helper to apply animation or instant visibility based on settings
+  const getStyle = useCallback(
+    (animation: typeof activePreset.handle, visible: boolean) => {
+      return settings.animationsEnabled
+        ? getAnimationStyle(animation, visible)
+        : noAnimationStyle(animation, visible);
+    },
+    [settings.animationsEnabled]
+  );
+
   // Don't render if extension is not active
   if (!active) return;
 
@@ -337,7 +391,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   if (isCapturing && !currentImage) return;
 
   return (
-    <LenseContainer ref={containerRef} initialPosition={lensePosition}>
+    <LenseContainer ref={containerRef} initialPosition={initialPosition}>
       {/* DOM order matches visual stacking: Handle (bottom) → MainCanvas → GlassOverlay → GridCanvas (top) */}
       <Handle
         ref={ringHandleRef}
@@ -363,8 +417,11 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         }
         textureShadow={getSubtleTextureColor(hoveredColor, 5, 25).shadow}
         patternName="knurling"
-        patternOpacity={0.25}
-        style={getAnimationStyle(activePreset.handle, canvasesVisible)}
+        patternOpacity={settings.handleTextureEnabled ? 0.25 : 0}
+        style={{
+          ...getStyle(activePreset.handle, canvasesVisible),
+          opacity: canvasesVisible ? settings.handleOpacity / 100 : 0
+        }}
       />
       <MainCanvas
         ref={mainCanvasRef}
@@ -374,11 +431,11 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         borderColor={hoveredColor}
         visible={canvasesVisible}
         shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
-        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
+        style={getStyle(activePreset.lenses, canvasesVisible)}
       />
       <GlassOverlay
         visible={canvasesVisible}
-        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
+        style={getStyle(activePreset.lenses, canvasesVisible)}
       />
       <GridCanvas
         id="lensor-grid-canvas"
@@ -387,7 +444,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         height={CANVAS_SIZE}
         visible={canvasesVisible}
         shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
-        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
+        style={getStyle(activePreset.lenses, canvasesVisible)}
       />
       <HiddenCanvas
         ref={fisheyeCanvasRef}
@@ -418,7 +475,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         onFisheyeToggle={handleFisheyeToggle}
         onManualRefresh={handleManualRefresh}
         onZoomChange={handleZoomChange}
-        style={getAnimationStyle(activePreset.drawer, canvasesVisible)}
+        style={getStyle(activePreset.drawer, canvasesVisible)}
       />
       {debugMode && (
         <DebugOverlay
