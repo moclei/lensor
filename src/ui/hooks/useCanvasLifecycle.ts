@@ -74,34 +74,51 @@ export function useCanvasLifecycle({
     }
 
     // Basic initialization when active becomes true, regardless of imageBitmap
+    // NOTE: We do NOT show canvases here - we wait for the first image to avoid
+    // the on/off/on flash during initial capture
     if (active && activeChanged) {
-      log('Active became true, initializing');
-      showCanvases(true);
+      log('Active became true, initializing (canvases stay hidden until first image)');
       initializeCanvases();
       setCanvasesReady(true);
     }
-  }, [active, showCanvases, initializeCanvases]);
+  }, [active, initializeCanvases]);
+
+  // Track if we've ever received an image (to distinguish initial vs recapture)
+  const hasEverHadImageRef = useRef(false);
 
   // Canvas initialization effect - for image-dependent operations
   useEffect(() => {
-    // Guard: Only run if canvas is actually mounted in the DOM
-    // (The component may return early during capture, leaving canvas unmounted)
-    if (active && imageBitmap && mainCanvasRef.current) {
-      log('Initializing with image bitmap');
+    // Guard: Only run if we have an active state and an image
+    if (active && imageBitmap) {
+      log('Received image bitmap');
 
       // Calculate scale
       const newScale = imageBitmap.width / window.innerWidth;
       setScale(newScale);
 
-      // Get and pass canvas center
-      const canvasCenter = getCanvasCenter();
+      // Show canvases on first image (this is where the entrance animation triggers)
+      if (!hasEverHadImageRef.current) {
+        log('First image received, showing canvases');
+        hasEverHadImageRef.current = true;
+        showCanvases(true);
+      }
 
-      // Optional draw complete callback
-      if (onDrawComplete) {
-        onDrawComplete(canvasCenter);
+      // Get and pass canvas center (only if canvas is mounted)
+      if (mainCanvasRef.current) {
+        const canvasCenter = getCanvasCenter();
+
+        // Optional draw complete callback
+        if (onDrawComplete) {
+          onDrawComplete(canvasCenter);
+        }
       }
     }
-  }, [active, imageBitmap, mainCanvasRef, getCanvasCenter, onDrawComplete]);
+
+    // Reset the "has ever had image" flag when deactivated
+    if (!active) {
+      hasEverHadImageRef.current = false;
+    }
+  }, [active, imageBitmap, mainCanvasRef, getCanvasCenter, onDrawComplete, showCanvases]);
 
   // Final draw complete effect
   useEffect(() => {

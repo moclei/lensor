@@ -29,6 +29,7 @@ import {
 import Handle from './Handle';
 import ControlDrawer, { DrawerPosition } from './ControlDrawer';
 import { debug } from '../../../lib/debug';
+import { activePreset, getAnimationStyle } from '@/ui/animations';
 
 const log = debug.ui;
 
@@ -328,8 +329,12 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     drawCrosshairs({ color: gridContrastColor });
   }, [gridOn, scale, zoom, drawGrid, drawCrosshairs, gridContrastColor]);
 
+  // Don't render if extension is not active
   if (!active) return;
-  if (isCapturing) return;
+
+  // During initial capture (no image yet), don't render
+  // During recaptures (we have an image), keep rendering with the previous image
+  if (isCapturing && !currentImage) return;
 
   return (
     <LenseContainer ref={containerRef} initialPosition={lensePosition}>
@@ -359,6 +364,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         textureShadow={getSubtleTextureColor(hoveredColor, 5, 25).shadow}
         patternName="knurling"
         patternOpacity={0.25}
+        style={getAnimationStyle(activePreset.handle, canvasesVisible)}
       />
       <MainCanvas
         ref={mainCanvasRef}
@@ -368,8 +374,12 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         borderColor={hoveredColor}
         visible={canvasesVisible}
         shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
+        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
       />
-      <GlassOverlay visible={canvasesVisible} />
+      <GlassOverlay
+        visible={canvasesVisible}
+        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
+      />
       <GridCanvas
         id="lensor-grid-canvas"
         ref={gridCanvasRef}
@@ -377,6 +387,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         height={CANVAS_SIZE}
         visible={canvasesVisible}
         shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
+        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
       />
       <HiddenCanvas
         ref={fisheyeCanvasRef}
@@ -407,6 +418,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         onFisheyeToggle={handleFisheyeToggle}
         onManualRefresh={handleManualRefresh}
         onZoomChange={handleZoomChange}
+        style={getAnimationStyle(activePreset.drawer, canvasesVisible)}
       />
       {debugMode && (
         <DebugOverlay
