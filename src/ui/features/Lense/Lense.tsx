@@ -29,6 +29,7 @@ import {
 import Handle from './Handle';
 import ControlDrawer, { DrawerPosition } from './ControlDrawer';
 import { debug } from '../../../lib/debug';
+import { activePreset, getAnimationStyle } from '@/ui/animations';
 
 const log = debug.ui;
 
@@ -328,47 +329,23 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     drawCrosshairs({ color: gridContrastColor });
   }, [gridOn, scale, zoom, drawGrid, drawCrosshairs, gridContrastColor]);
 
+  // Don't render if extension is not active
   if (!active) return;
-  if (isCapturing) return;
+
+  // During initial capture (no image yet), don't render
+  // During recaptures (we have an image), keep rendering with the previous image
+  if (isCapturing && !currentImage) return;
 
   return (
     <LenseContainer ref={containerRef} initialPosition={lensePosition}>
-      <MainCanvas
-        ref={mainCanvasRef}
-        id="lensor-main-canvas"
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        borderColor={hoveredColor}
-        visible={canvasesVisible}
-        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
-      />
-      <GridCanvas
-        id="lensor-grid-canvas"
-        ref={gridCanvasRef}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        visible={canvasesVisible}
-        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
-      />
-      <GlassOverlay visible={canvasesVisible} />
-      <HiddenCanvas
-        ref={fisheyeCanvasRef}
-        id="lensor-fisheye-canvas"
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-      />
-      <HiddenCanvas
-        ref={interCanvasRef}
-        id="lensor-inter-canvas"
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-      />
+      {/* DOM order matches visual stacking: Handle (bottom) → MainCanvas → GlassOverlay → GridCanvas (top) */}
       <Handle
         ref={ringHandleRef}
         id="lensor-ring-handle"
         className="circle-ring"
         canvasSize={CANVAS_SIZE}
         borderSize={60}
+        visible={canvasesVisible}
         contrastColor={hexToRgba(
           convertToGrayscalePreservingFormat(
             materialPalette?.[800] || '#000000'
@@ -387,27 +364,62 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         textureShadow={getSubtleTextureColor(hoveredColor, 5, 25).shadow}
         patternName="knurling"
         patternOpacity={0.25}
-        style={{ display: canvasesVisible ? 'block' : 'none' }}
+        style={getAnimationStyle(activePreset.handle, canvasesVisible)}
       />
-      {canvasesVisible && (
-        <ControlDrawer
-          canvasSize={CANVAS_SIZE}
-          accentColor={materialPalette?.[500] || hoveredColor}
-          position={drawerPosition}
-          isOpen={drawerOpen}
-          gridOn={gridOn}
-          fisheyeOn={fisheyeOn}
-          zoom={zoom}
-          hoveredColor={hoveredColor}
-          colorPalette={colorPalette}
-          materialPalette={materialPalette}
-          onToggle={handleDrawerToggle}
-          onGridToggle={handleGridToggle}
-          onFisheyeToggle={handleFisheyeToggle}
-          onManualRefresh={handleManualRefresh}
-          onZoomChange={handleZoomChange}
-        />
-      )}
+      <MainCanvas
+        ref={mainCanvasRef}
+        id="lensor-main-canvas"
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+        borderColor={hoveredColor}
+        visible={canvasesVisible}
+        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
+        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
+      />
+      <GlassOverlay
+        visible={canvasesVisible}
+        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
+      />
+      <GridCanvas
+        id="lensor-grid-canvas"
+        ref={gridCanvasRef}
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+        visible={canvasesVisible}
+        shadowColor={hexToRgba(materialPalette?.[400] || '#000000', 0.2)}
+        style={getAnimationStyle(activePreset.lenses, canvasesVisible)}
+      />
+      <HiddenCanvas
+        ref={fisheyeCanvasRef}
+        id="lensor-fisheye-canvas"
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+      />
+      <HiddenCanvas
+        ref={interCanvasRef}
+        id="lensor-inter-canvas"
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+      />
+      <ControlDrawer
+        canvasSize={CANVAS_SIZE}
+        accentColor={materialPalette?.[500] || hoveredColor}
+        position={drawerPosition}
+        visible={canvasesVisible}
+        isOpen={drawerOpen}
+        gridOn={gridOn}
+        fisheyeOn={fisheyeOn}
+        zoom={zoom}
+        hoveredColor={hoveredColor}
+        colorPalette={colorPalette}
+        materialPalette={materialPalette}
+        onToggle={handleDrawerToggle}
+        onGridToggle={handleGridToggle}
+        onFisheyeToggle={handleFisheyeToggle}
+        onManualRefresh={handleManualRefresh}
+        onZoomChange={handleZoomChange}
+        style={getAnimationStyle(activePreset.drawer, canvasesVisible)}
+      />
       {debugMode && (
         <DebugOverlay
           imageBitmap={currentImage}

@@ -84,12 +84,17 @@ const getContainerPositioning = (
 export const DrawerContainer = styled.div<{
   canvasSize: number;
   position: DrawerPosition;
+  visible: boolean;
 }>`
   position: absolute;
   display: flex;
   z-index: 20;
   pointer-events: none;
   ${(props) => getContainerPositioning(props.position, props.canvasSize)}
+  
+  /* Visibility controlled via opacity for animation capability */
+  opacity: ${(props) => (props.visible ? 1 : 0)};
+  transition: opacity 0.2s ease-out;
 `;
 
 // Helper to get pull tab arrow based on position and open state

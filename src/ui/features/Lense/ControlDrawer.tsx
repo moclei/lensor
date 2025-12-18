@@ -38,6 +38,8 @@ interface ControlDrawerProps {
   canvasSize: number;
   accentColor: string;
   position?: DrawerPosition;
+  visible: boolean;
+  style?: React.CSSProperties;
   // State values
   isOpen: boolean;
   gridOn: boolean;
@@ -61,6 +63,8 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   canvasSize,
   accentColor,
   position = 'bottom',
+  visible,
+  style,
   isOpen,
   gridOn,
   fisheyeOn,
@@ -110,7 +114,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
     .slice(0, 6); // Show max 6 swatches
 
   return (
-    <DrawerContainer canvasSize={canvasSize} position={position}>
+    <DrawerContainer canvasSize={canvasSize} position={position} visible={visible} style={style}>
       {/* Pull tab */}
       <PullTab
         accentColor={accentColor}

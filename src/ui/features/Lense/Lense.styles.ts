@@ -18,15 +18,17 @@ const MainCanvas = styled.canvas<{
   visible: boolean;
 }>`
   position: absolute;
-  z-index: 6;
   border-radius: 50%;
   width: 400px;
   height: 400px;
   overflow: hidden;
-  opacity: 1;
   box-shadow: inset 0 0 4px 6px ${(props) => props.shadowColor};
   image-rendering: pixelated;
-  display: ${(props) => (props.visible ? 'block' : 'none')};
+  
+  /* Visibility controlled via opacity for animation capability */
+  opacity: ${(props) => (props.visible ? 1 : 0)};
+  pointer-events: ${(props) => (props.visible ? 'auto' : 'none')};
+  transition: opacity 0.2s ease-out;
 `;
 
 const GridCanvas = styled.canvas<{
@@ -34,11 +36,14 @@ const GridCanvas = styled.canvas<{
   visible: boolean;
 }>`
   position: absolute;
-  z-index: 10;
   border-radius: 50%;
   overflow: hidden;
   box-shadow: ${(props) => props.shadowColor} 0px 0px 4px 6px inset;
-  display: ${(props) => (props.visible ? 'block' : 'none')};
+  
+  /* Visibility controlled via opacity for animation capability */
+  opacity: ${(props) => (props.visible ? 1 : 0)};
+  pointer-events: ${(props) => (props.visible ? 'auto' : 'none')};
+  transition: opacity 0.2s ease-out;
 `;
 
 const HiddenCanvas = styled.canvas`
@@ -48,12 +53,10 @@ const HiddenCanvas = styled.canvas`
 /* Glass effect overlay - sits on top of canvas to add lens realism */
 const GlassOverlay = styled.div<{ visible: boolean }>`
   position: absolute;
-  z-index: 9;
   width: 400px;
   height: 400px;
   border-radius: 50%;
   pointer-events: none;
-  display: ${(props) => (props.visible ? 'block' : 'none')};
   
   /* #1: Vignette - darkens edges like real lens light falloff */
   background: radial-gradient(
@@ -66,6 +69,10 @@ const GlassOverlay = styled.div<{ visible: boolean }>`
   
   /* #3: Inner frame shadow - frame casts shadow onto glass */
   box-shadow: inset 0 0 20px 8px rgba(0, 0, 0, 0.25);
+  
+  /* Visibility controlled via opacity for animation capability */
+  opacity: ${(props) => (props.visible ? 1 : 0)};
+  transition: opacity 0.2s ease-out;
 `;
 
 const ButtonSegment = styled.div`

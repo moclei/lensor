@@ -17,6 +17,11 @@ context_docs:
   manifest: .context/manifest.yaml
   ideas: .context/IDEAS.md
 
+documentation:
+  animation:
+    stacking_inventory: docs/animation/stacking_inventory.md
+    description: UI element layering, visibility control, and animation preset system
+
 tech_stack:
   language: TypeScript
   runtime: Browser (Chrome Extension)
@@ -106,6 +111,12 @@ files:
     useGrid: src/ui/hooks/useGrid.ts
     usePageObserver: src/ui/hooks/usePageObserver.ts
     useLensorState: src/ui/hooks/useLensorState.ts
+
+  animations:
+    index: src/ui/animations/index.ts
+    types: src/ui/animations/types.ts
+    presets:
+      fade_scale: src/ui/animations/presets/fade-scale.ts
 
   utilities:
     color_utils: src/ui/utils/color-utils.tsx
