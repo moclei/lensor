@@ -90,7 +90,7 @@ export function useSavedColors() {
       const newColor: SavedColor = {
         id: generateId(),
         color: color,
-        label: label || hexColor,
+        label: label || '', // Empty by default, user can name it
         savedAt: Date.now(),
       };
 

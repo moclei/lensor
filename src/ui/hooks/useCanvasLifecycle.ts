@@ -7,6 +7,7 @@ interface CanvasLifecycleOptions {
   imageBitmap: ImageBitmap | null;
   mainCanvasRef: React.RefObject<HTMLCanvasElement>;
   active: boolean;
+  isCapturing?: boolean;
   onInitialize?: () => void;
   onDrawComplete?: (canvasCenter: { x: number; y: number }) => void;
 }
@@ -15,6 +16,7 @@ export function useCanvasLifecycle({
   imageBitmap,
   mainCanvasRef,
   active,
+  isCapturing = false,
   onInitialize,
   onDrawComplete
 }: CanvasLifecycleOptions) {
@@ -133,6 +135,20 @@ export function useCanvasLifecycle({
       setInitialDrawComplete(true);
     }
   }, [canvasesReady, imageBitmap, mainCanvasRef, initialDrawComplete, active]);
+
+  // Hide canvases during capture (for recapture screenshots)
+  // This ensures the lens doesn't appear in its own screenshot
+  useEffect(() => {
+    if (isCapturing && hasEverHadImageRef.current) {
+      // During recapture: hide the canvases so they don't appear in screenshot
+      log('Capture started, hiding canvases');
+      setCanvasesVisible(false);
+    } else if (!isCapturing && hasEverHadImageRef.current && active) {
+      // Capture complete: show canvases again
+      log('Capture complete, showing canvases');
+      setCanvasesVisible(true);
+    }
+  }, [isCapturing, active]);
 
   return {
     canvasesVisible,
