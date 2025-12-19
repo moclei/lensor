@@ -174,6 +174,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     imageBitmap: currentImage,
     mainCanvasRef,
     active,
+    isCapturing,
     onInitialize: () => {
       if (gridOn) drawGrid();
       drawCrosshairs();
@@ -468,8 +469,6 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
         fisheyeOn={fisheyeOn}
         zoom={zoom}
         hoveredColor={hoveredColor}
-        colorPalette={colorPalette}
-        materialPalette={materialPalette}
         onToggle={handleDrawerToggle}
         onGridToggle={handleGridToggle}
         onFisheyeToggle={handleFisheyeToggle}

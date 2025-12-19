@@ -62,6 +62,10 @@ export function useMediaCapture(
   // The full-screen overlay fades in 200ms, so 250ms ensures it's completely gone
   const FLASH_FADE_DELAY_MS = 250;
 
+  // Time to wait for lens to hide via CSS transition (opacity 0.2s = 200ms)
+  // Adding buffer for React state update + browser paint
+  const LENS_HIDE_DELAY_MS = 250;
+
   // Capture a frame using captureVisibleTab
   const captureFrame = useCallback(async () => {
     log('Capturing frame via captureVisibleTab');
@@ -75,20 +79,13 @@ export function useMediaCapture(
     await new Promise((resolve) => setTimeout(resolve, FLASH_FADE_DELAY_MS));
 
     // Step 3: Clear flash state and hide lens for capture
+    // Setting isCapturing to true triggers CSS opacity transition in useCanvasLifecycle
     setIsFlashing(false);
     setIsCapturing(true);
 
-    // Wait for React to re-render and browser to paint (lens hidden)
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          resolve();
-        });
-      });
-    });
-
-    // Additional delay for UI to fully hide
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for CSS opacity transition to complete (lens becomes invisible)
+    // The transition is 200ms, we add buffer for React state propagation + browser paint
+    await new Promise((resolve) => setTimeout(resolve, LENS_HIDE_DELAY_MS));
 
     try {
       // Call the service worker action to capture the tab

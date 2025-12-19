@@ -17,25 +17,28 @@ Issues that need resolution before Chrome Web Store release:
 
 ### Color Features
 
-- [x] **Color format options** — Display/copy as HEX, RGB, HSL, HSV
+- [x] **Color format options** — Display/copy as HEX, RGB, HSL ✓ Configurable in settings
 - [x] **Color harmony modes** — Complementary, triadic, analogous, split-complementary ✓ Implemented (monochromatic + Material Design palettes)
-- [ ] **Copy to clipboard** — One-click copy of detected color
-- [ ] **Color history** — Track recently detected colors
+- [x] **Copy to clipboard** — One-click copy of detected color ✓ Click any swatch to copy
+- [x] **Color history** — Track recently detected colors ✓ Implemented as "Saved Colors" feature
 - [ ] **Accessibility checker** — WCAG contrast ratio analysis
 - [ ] **Color blind simulation** — Preview detected colors through various color blindness types
 
-### Extension Options Page
+### Extension Options Page ✓ IMPLEMENTED
 
-> **Summary**: Full-page UI for advanced settings and saved palettes (keyed by URL).
+> **Summary**: Full-page UI for advanced settings and saved palettes.
 
-A dedicated extension page (`chrome-extension://xxx/settings.html`) for features that don't fit in the compact slide drawer. Built with React and connected via Crann like other contexts.
+A dedicated extension page (`chrome-extension://xxx/settings/settings.html`) for features that don't fit in the compact slide drawer. Built with React and uses `chrome.storage.sync` for persistence.
 
-**Key features:**
+**Implemented features:**
 
-- Advanced configuration options
-- Saved color palettes, keyed to the website URL where they were captured
-- View, manage, and delete saved palettes
-- Potential future home for other power-user features
+- ✅ Tabbed UI (Settings + Saved Colors)
+- ✅ Live preview pane with real WebGL fisheye effect
+- ✅ 9 configurable settings (zoom, grid, fisheye, animations, flash, handle texture/opacity, color format, timeout)
+- ✅ Saved colors with editable labels
+- ✅ Computed harmony + material palettes for each saved color
+- ✅ Copy any color to clipboard, delete individual or all
+- ✅ Settings sync across devices via chrome.storage.sync
 
 ### Live Video Mode
 
@@ -140,13 +143,13 @@ As a web developer, verifying pixel-perfect spacing from designs (Figma, etc.) a
 - [ ] **Dark/light theme** — Match system preference for drawer UI
 - [ ] **Compact mode** — Minimal UI for power users
 - [ ] **Lens cursor customization** — Custom cursor when hovering lens
-- [ ] **Configurable inactivity timeout** — Setting to adjust the 20-minute auto-shutdown timer
+- [x] **Configurable inactivity timeout** — Setting to adjust auto-shutdown timer ✓ Implemented (5-60 min or disabled)
 - [ ] **Timeout warning** — Show visual warning before auto-shutdown (e.g., "Shutting down in 1 minute...")
 
 ## Long-term Possibilities
 
 - [ ] **AI color suggestions** — ML-powered palette recommendations
-- [ ] **Browser sync** — Sync saved palettes across devices
+- [x] **Browser sync** — Sync saved palettes across devices ✓ Implemented via chrome.storage.sync
 - [ ] **Figma/Sketch integration** — Export directly to design tools
 - [ ] **Color trends database** — Compare to current design trends
 - [ ] **Team features** — Share palettes with collaborators

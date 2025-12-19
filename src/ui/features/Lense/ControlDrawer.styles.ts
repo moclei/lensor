@@ -10,7 +10,7 @@ const slideDown = keyframes`
     opacity: 0;
   }
   to {
-    max-height: 300px;
+    max-height: 400px;
     opacity: 1;
   }
 `;
@@ -208,38 +208,38 @@ const getDrawerPanelStyles = (
     case 'bottom':
       return css`
         ${baseStyles}
-        width: 260px;
+        width: 320px;
         border-radius: 0 0 20px 20px;
         border-top: 2px solid ${accentColor};
-        max-height: ${isOpen ? '300px' : '0'};
+        max-height: ${isOpen ? '400px' : '0'};
       `;
     case 'top':
       return css`
         ${baseStyles}
-        width: 260px;
+        width: 320px;
         border-radius: 20px 20px 0 0;
         border-bottom: 2px solid ${accentColor};
-        max-height: ${isOpen ? '300px' : '0'};
+        max-height: ${isOpen ? '400px' : '0'};
       `;
     case 'right':
       return css`
         ${baseStyles}
         height: auto;
-        max-height: 300px;
+        max-height: 400px;
         border-radius: 0 20px 20px 0;
         border-left: 2px solid ${accentColor};
-        max-width: ${isOpen ? '260px' : '0'};
-        width: ${isOpen ? '260px' : '0'};
+        max-width: ${isOpen ? '320px' : '0'};
+        width: ${isOpen ? '320px' : '0'};
       `;
     case 'left':
       return css`
         ${baseStyles}
         height: auto;
-        max-height: 300px;
+        max-height: 400px;
         border-radius: 20px 0 0 20px;
         border-right: 2px solid ${accentColor};
-        max-width: ${isOpen ? '260px' : '0'};
-        width: ${isOpen ? '260px' : '0'};
+        max-width: ${isOpen ? '320px' : '0'};
+        width: ${isOpen ? '320px' : '0'};
       `;
   }
 };

@@ -12,22 +12,22 @@ Lensor creates a circular "lens" UI element that floats over web pages. Users ca
 
 ## Architecture
 
-Lensor operates across two independent JavaScript execution contexts, synchronized via **Crann** (a custom state management library):
+Lensor operates across three independent JavaScript execution contexts, synchronized via **Crann** (a custom state management library) and **chrome.storage.sync**:
 
 ```
-┌───────────────────────────────────────────────────────┐
-│                   Chrome Extension                     │
-├─────────────────────┬─────────────────────────────────┤
-│   Service Worker    │         Content Script          │
-│   (Background)      │         (Per-Tab UI)            │
-├─────────────────────┼─────────────────────────────────┤
-│ • Extension APIs    │ • Shadow DOM host               │
-│ • tabCapture        │ • React app (Lens + Drawer)     │
-│ • State hub         │ • Canvas rendering              │
-│                     │ • Drag handling                 │
-│                     │ • Slide drawer controls         │
-└─────────────────────┴─────────────────────────────────┘
-                    ↕ Crann State Sync ↕
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Chrome Extension                              │
+├─────────────────────┬─────────────────────────┬─────────────────────┤
+│   Service Worker    │     Content Script      │    Settings Page    │
+│   (Background)      │     (Per-Tab UI)        │   (Extension Tab)   │
+├─────────────────────┼─────────────────────────┼─────────────────────┤
+│ • Extension APIs    │ • Shadow DOM host       │ • React app         │
+│ • tabCapture        │ • React app (Lens)      │ • Live preview      │
+│ • State hub         │ • Canvas rendering      │ • Saved colors      │
+│ • Settings opener   │ • Drag handling         │ • Settings controls │
+│                     │ • Slide drawer          │ • WebGL fisheye     │
+└─────────────────────┴─────────────────────────┴─────────────────────┘
+           ↕ Crann State Sync ↕              ↕ chrome.storage.sync ↕
 ```
 
 ### Screen Capture Flow
@@ -78,18 +78,20 @@ Key state items:
 ### Core (MVP)
 
 - **Draggable Lens**: Circular magnifying lens with drag handle
-- **Zoom Control**: Adjustable magnification (0.5x–16x)
+- **Zoom Control**: Adjustable magnification (1x–16x)
 - **Color Detection**: Detects RGB color at lens center
 - **Color Palettes**: Generates monochromatic and Material Design palettes from detected color
 - **Auto-Recapture**: Re-captures page automatically on scroll and resize
 - **Manual Refresh**: Button in slide drawer to manually trigger a new capture
-- **Inactivity Timeout**: Automatically shuts down after 20 minutes of inactivity to stop screen capture
+- **Inactivity Timeout**: Configurable auto-shutdown (5-60 min or disabled) to stop screen capture
+- **Saved Colors**: Save colors with heart button, view/manage in settings page
 
 ### Visual Options
 
 - **Grid Overlay**: Shows pixel grid over magnified area
 - **Fisheye Effect**: WebGL-based fisheye distortion (aesthetic feature)
 - **Adaptive Theming**: Lens handle/border colors adapt to detected color
+- **Handle Customization**: Toggle texture pattern, adjust opacity
 
 ### Controls (Slide Drawer)
 
@@ -100,6 +102,27 @@ A slide-out drawer UI attached to the lens provides quick access to settings:
 - Manual refresh button (re-capture the page)
 - Adjust zoom level
 - View current color and generated palettes
+- **Save color** (heart button) — saves to collection
+- **Open settings** (gear button) — opens settings page
+
+### Settings Page
+
+A dedicated extension page (`chrome-extension://xxx/settings/settings.html`) with tabbed UI:
+
+**Settings Tab:**
+- Default zoom, grid, fisheye states
+- Animation and flash effect toggles
+- Handle texture and opacity controls
+- Color copy format (HEX/RGB/HSL)
+- Inactivity timeout configuration
+- Live preview pane with real WebGL fisheye
+
+**Saved Colors Tab:**
+- View all saved colors with palettes
+- Editable labels for organization
+- Copy any color to clipboard
+- Delete colors individually or clear all
+- Max 50 colors synced via chrome.storage.sync
 
 ## Directory Structure
 
@@ -109,11 +132,21 @@ src/
 │   └── service-worker.ts    # Extension background script
 ├── scripts/
 │   └── content-script.ts    # Minimal bootstrap (mostly unused now)
+├── settings/                # Settings page (extension tab)
+│   ├── index.tsx            # Entry point
+│   ├── settings.html        # HTML template
+│   ├── SettingsApp.tsx      # Main app with tabbed UI
+│   ├── LensPreview.tsx      # Live preview component
+│   ├── types.ts             # Settings types and defaults
+│   ├── useSettings.ts       # Settings hook (chrome.storage.sync)
+│   └── savedColors.ts       # Saved colors hook and types
 ├── ui/                      # Injected React app (Lens + Drawer)
 │   ├── index.tsx            # Entry point, Shadow DOM setup, Crann connect
 │   ├── state-config.ts      # Crann state configuration
+│   ├── animations/          # Animation presets and helpers
 │   ├── features/
-│   │   └── Lense/           # Main lens component and styles
+│   │   ├── Lense/           # Main lens component and styles
+│   │   └── CaptureFlash/    # Flash effect on capture
 │   ├── hooks/               # React hooks for functionality
 │   │   ├── useMediaCapture.ts    # Screen capture logic
 │   │   ├── useDraggable.ts       # Drag behavior
@@ -184,14 +217,17 @@ The build script (`build.mjs`):
 
 ## Current Work
 
-**Branch**: `feat/color-palettes`
+**Branch**: `feat/more-controls`
 
-Implementing color palette generation from the detected pixel color:
+Settings page and saved colors feature:
 
-- ✅ Monochromatic color harmony generation
-- ✅ Material Design tone generation (50–900 weights)
-- ✅ Palette display in slide drawer
-- ✅ Adaptive lens theming based on palette
+- ✅ Settings page with tabbed UI (Settings + Saved Colors)
+- ✅ Live preview pane with WebGL fisheye effect
+- ✅ 9 configurable settings stored in chrome.storage.sync
+- ✅ Saved colors with editable labels and computed palettes
+- ✅ Lens opens centered (top 10% of viewport)
+- ✅ Heart button in drawer to save colors
+- ✅ Gear button in drawer to open settings
 
 ## Known Considerations
 

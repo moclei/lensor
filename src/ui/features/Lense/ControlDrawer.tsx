@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   DrawerContainer,
   PullTab,
@@ -23,9 +23,9 @@ import {
   SaveColorButton,
   DrawerPosition
 } from './ControlDrawer.styles';
-import { parseRgbColor, rgbToHex, rgbToHsl } from '@/ui/utils/color-utils';
+import { parseRgbColor, rgbToHex, rgbToHsl, generateAnyPalette, getPaletteDisplayName } from '@/ui/utils/color-utils';
 import { useSettings } from '../../../settings/useSettings';
-import { ColorCopyFormat } from '../../../settings/types';
+import { ColorCopyFormat, PaletteType } from '../../../settings/types';
 import { useSavedColors, colorToHex } from '../../../settings/savedColors';
 
 // Re-export the type for consumers
@@ -84,8 +84,6 @@ interface ControlDrawerProps {
   fisheyeOn: boolean;
   zoom: number;
   hoveredColor: string;
-  colorPalette: string[];
-  materialPalette: Record<number, string>;
   // Callbacks
   onToggle: () => void;
   onGridToggle: () => void;
@@ -108,8 +106,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   fisheyeOn,
   zoom,
   hoveredColor,
-  colorPalette,
-  materialPalette,
   onToggle,
   onGridToggle,
   onFisheyeToggle,
@@ -125,6 +121,19 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
   const isColorSaved = savedColors.some(
     (c) => colorToHex(c.color) === colorToHex(hoveredColor)
   );
+
+  // Generate palettes based on settings (with fallback to defaults)
+  const displayPalettes = useMemo(() => {
+    const palettesToShow = settings.drawerPalettes?.length > 0 
+      ? settings.drawerPalettes 
+      : ['monochromatic', 'material'] as PaletteType[];
+    
+    return palettesToShow.map((paletteType: PaletteType) => ({
+      type: paletteType,
+      name: getPaletteDisplayName(paletteType),
+      colors: generateAnyPalette(hoveredColor, paletteType)
+    }));
+  }, [hoveredColor, settings.drawerPalettes]);
 
   const handleSaveColor = useCallback(() => {
     if (isColorSaved) {
@@ -166,12 +175,6 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
 
   // Convert hovered color to hex for display
   const hexColor = rgbStringToHex(hoveredColor);
-
-  // Get material palette as sorted array
-  const materialColors = Object.entries(materialPalette)
-    .map(([weight, color]) => ({ weight: parseInt(weight), color }))
-    .sort((a, b) => a.weight - b.weight)
-    .slice(0, 6); // Show max 6 swatches
 
   return (
     <DrawerContainer canvasSize={canvasSize} position={position} visible={visible} style={style}>
@@ -256,40 +259,23 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
             </ZoomControl>
           </ControlsRow>
 
-          {/* Color harmony palette */}
-          {colorPalette.length > 0 && (
-            <PaletteSection>
-              <PaletteLabel>Color Harmony</PaletteLabel>
+          {/* Dynamic palettes based on settings */}
+          {displayPalettes.map((palette, paletteIndex) => (
+            <PaletteSection key={palette.type}>
+              <PaletteLabel>{palette.name}</PaletteLabel>
               <SwatchRow>
-                {colorPalette.slice(0, 5).map((color, index) => (
+                {palette.colors.slice(0, 6).map((color, index) => (
                   <ColorSwatch
-                    key={`harmony-${index}`}
+                    key={`${palette.type}-${index}`}
                     color={color}
-                    isMain={index === 0}
+                    isMain={paletteIndex === 0 && index === 0}
                     onClick={() => copyToClipboard(color)}
                     title={`Click to copy ${color}`}
                   />
                 ))}
               </SwatchRow>
             </PaletteSection>
-          )}
-
-          {/* Material tones palette */}
-          {materialColors.length > 0 && (
-            <PaletteSection>
-              <PaletteLabel>Material Tones</PaletteLabel>
-              <SwatchRow>
-                {materialColors.map(({ weight, color }) => (
-                  <ColorSwatch
-                    key={`material-${weight}`}
-                    color={color}
-                    onClick={() => copyToClipboard(color)}
-                    title={`${weight} - Click to copy`}
-                  />
-                ))}
-              </SwatchRow>
-            </PaletteSection>
-          )}
+          ))}
         </DrawerContent>
       </DrawerPanel>
 

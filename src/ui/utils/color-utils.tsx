@@ -228,15 +228,41 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
+// ============ Color Palette Theory Types ============
+
+export type PaletteType =
+  | 'monochromatic'
+  | 'analogous'
+  | 'complementary'
+  | 'splitComplementary'
+  | 'triadic'
+  | 'tetradic'
+  | 'material';
+
+export interface PaletteInfo {
+  id: PaletteType;
+  name: string;
+  description: string;
+}
+
+// All available palette theories
+export const PALETTE_THEORIES: PaletteInfo[] = [
+  { id: 'monochromatic', name: 'Harmony', description: 'Shades and tints of one color' },
+  { id: 'analogous', name: 'Analogous', description: 'Adjacent colors on the wheel' },
+  { id: 'complementary', name: 'Complementary', description: 'Opposite colors on the wheel' },
+  { id: 'splitComplementary', name: 'Split Complementary', description: 'Base + two colors adjacent to its complement' },
+  { id: 'triadic', name: 'Triadic', description: 'Three evenly spaced colors' },
+  { id: 'tetradic', name: 'Tetradic', description: 'Four evenly spaced colors' },
+  { id: 'material', name: 'Material', description: 'Google Material Design tones' },
+];
+
+// Default palettes shown in the drawer
+export const DEFAULT_DRAWER_PALETTES: PaletteType[] = ['monochromatic', 'material'];
+
 // Generate a palette using different color harmony rules
 export function generatePalette(
   rgbStr: string,
-  type:
-    | 'analogous'
-    | 'triadic'
-    | 'complementary'
-    | 'monochromatic'
-    | 'tetradic' = 'analogous'
+  type: Exclude<PaletteType, 'material'> = 'monochromatic'
 ): string[] {
   const rgb = parseRgbColor(rgbStr);
   if (!rgb) {
@@ -252,15 +278,12 @@ export function generatePalette(
     case 'monochromatic':
       // Same hue, different lightness/saturation
       palette.push(baseColor); // Original color
-
       // Darker variants
       palette.push(rgbToHex(...hslToRgb(h, s, Math.max(l - 20, 0))));
       palette.push(rgbToHex(...hslToRgb(h, s, Math.max(l - 40, 0))));
-
       // Lighter variants
       palette.push(rgbToHex(...hslToRgb(h, s, Math.min(l + 20, 100))));
       palette.push(rgbToHex(...hslToRgb(h, s, Math.min(l + 40, 100))));
-
       break;
 
     case 'analogous':
@@ -277,18 +300,29 @@ export function generatePalette(
       palette.push(baseColor); // Original color
       palette.push(rgbToHex(...hslToRgb((h + 120) % 360, s, l))); // +120 degrees
       palette.push(rgbToHex(...hslToRgb((h + 240) % 360, s, l))); // +240 degrees
+      // Add darker/lighter variants to fill out 5 swatches
+      palette.push(rgbToHex(...hslToRgb(h, s, Math.max(l - 20, 0))));
+      palette.push(rgbToHex(...hslToRgb(h, s, Math.min(l + 20, 100))));
       break;
 
     case 'complementary':
       // Colors opposite on the color wheel
       palette.push(baseColor); // Original color
       palette.push(rgbToHex(...hslToRgb((h + 180) % 360, s, l))); // Opposite color
-
       // Add variations
       palette.push(rgbToHex(...hslToRgb(h, s, Math.max(l - 15, 0)))); // Darker original
-      palette.push(
-        rgbToHex(...hslToRgb((h + 180) % 360, s, Math.max(l - 15, 0)))
-      ); // Darker opposite
+      palette.push(rgbToHex(...hslToRgb((h + 180) % 360, s, Math.max(l - 15, 0)))); // Darker opposite
+      palette.push(rgbToHex(...hslToRgb(h, s, Math.min(l + 15, 100)))); // Lighter original
+      break;
+
+    case 'splitComplementary':
+      // Base color + two colors adjacent to the complement
+      palette.push(baseColor); // Original color
+      palette.push(rgbToHex(...hslToRgb((h + 150) % 360, s, l))); // +150 degrees
+      palette.push(rgbToHex(...hslToRgb((h + 210) % 360, s, l))); // +210 degrees
+      // Add variants
+      palette.push(rgbToHex(...hslToRgb(h, s, Math.max(l - 20, 0))));
+      palette.push(rgbToHex(...hslToRgb(h, s, Math.min(l + 20, 100))));
       break;
 
     case 'tetradic':
@@ -297,10 +331,35 @@ export function generatePalette(
       palette.push(rgbToHex(...hslToRgb((h + 90) % 360, s, l))); // +90 degrees
       palette.push(rgbToHex(...hslToRgb((h + 180) % 360, s, l))); // +180 degrees
       palette.push(rgbToHex(...hslToRgb((h + 270) % 360, s, l))); // +270 degrees
+      // Add one more variant
+      palette.push(rgbToHex(...hslToRgb(h, s, Math.max(l - 20, 0))));
       break;
   }
 
   return palette;
+}
+
+// Generate any palette type (unified API)
+export function generateAnyPalette(rgbStr: string, type: PaletteType): string[] {
+  if (type === 'material') {
+    const materialMap = generateMaterialPalette(rgbStr);
+    // Return just the colors as array (50, 200, 400, 500, 700, 900)
+    return [
+      materialMap[50],
+      materialMap[200],
+      materialMap[400],
+      materialMap[500],
+      materialMap[700],
+      materialMap[900],
+    ].filter(Boolean);
+  }
+  return generatePalette(rgbStr, type);
+}
+
+// Get display name for a palette type
+export function getPaletteDisplayName(type: PaletteType): string {
+  const info = PALETTE_THEORIES.find(p => p.id === type);
+  return info?.name || type;
 }
 
 // Create Material-style tonal palette (based on a primary color)
