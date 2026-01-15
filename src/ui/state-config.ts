@@ -19,21 +19,17 @@ export const LensorStateConfig = {
   //   default: null as string | null,
   //   partition: Partition.Instance
   // },
-  isSidepanelShown: {
-    default: false,
-    partition: Partition.Instance
-  },
   hoveredColor: {
     default: 'rgb(87, 102, 111)',
-    partition: Partition.Service
+    partition: Partition.Instance
   },
   materialPalette: {
     default: {} as Record<number, string>,
-    partition: Partition.Service
+    partition: Partition.Instance
   },
   colorPalette: {
     default: [] as string[],
-    partition: Partition.Service
+    partition: Partition.Instance
   },
   showGrid: {
     default: false,
@@ -57,7 +53,7 @@ export const LensorStateConfig = {
   },
   lensePosition: {
     default: { x: 0, y: 0 },
-    partition: Partition.Service
+    partition: Partition.Instance
   },
   isCapturing: {
     default: false,

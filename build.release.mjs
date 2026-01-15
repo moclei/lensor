@@ -144,15 +144,6 @@ async function build() {
       format: 'esm',
     });
     
-    // Build sidepanel
-    await esbuild.build({
-      ...commonOptions,
-      entryPoints: ['./src/sidepanel/index.tsx'],
-      outfile: 'dist/sidepanel/index.js',
-      target: ['chrome91'],  // Modern Chrome only
-      loader: { '.ts': 'ts', '.tsx': 'tsx' },
-    });
-    
     // Build UI
     await esbuild.build({
       ...commonOptions,
@@ -160,6 +151,21 @@ async function build() {
       outfile: 'dist/ui/index.js',
       target: ['chrome91'],  // Modern Chrome only
       loader: { '.ts': 'ts', '.tsx': 'tsx' },
+    });
+    
+    // Build settings page
+    await esbuild.build({
+      ...commonOptions,
+      entryPoints: ['./src/settings/index.tsx'],
+      outfile: 'dist/settings/index.js',
+      target: ['chrome91'],
+      loader: { '.ts': 'ts', '.tsx': 'tsx' },
+      alias: {
+        '@': './src',
+        '@ui': './src/ui',
+        '@features': './src/ui/features',
+        '@utils': './src/ui/utils',
+      },
     });
     
     // Copy assets
@@ -179,12 +185,12 @@ async function build() {
       }
     });
     
-    // Copy sidepanel HTML
-    ensureDirExists(path.join(distDir, 'sidepanel'));
-    const sidepanelDir = './src/sidepanel';
-    fs.readdirSync(sidepanelDir).forEach(file => {
+    // Copy settings HTML
+    const settingsDir = './src/settings';
+    ensureDirExists(path.join(distDir, 'settings'));
+    fs.readdirSync(settingsDir).forEach(file => {
       if (file.endsWith('.html')) {
-        fs.copyFileSync(`${srcDir}/sidepanel/${file}`, `${distDir}/sidepanel/${file}`);
+        fs.copyFileSync(`${settingsDir}/${file}`, `${distDir}/settings/${file}`);
       }
     });
     
@@ -194,7 +200,7 @@ async function build() {
     // Calculate bundle sizes
     const files = [
       'dist/ui/index.js',
-      'dist/sidepanel/index.js',
+      'dist/settings/index.js',
       'dist/service-workers/service-worker.js',
       'dist/scripts/content-script.js',
     ];

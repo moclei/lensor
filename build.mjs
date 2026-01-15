@@ -17,7 +17,6 @@ const entryPoints = [
     './src/service-workers/service-worker.ts',
 ];
 const assets = ['./src/assets'];
-const sidepanelDir = './src/sidepanel';
 
 const build = () => {
     ensureDirExists(distDir);
@@ -35,19 +34,6 @@ const build = () => {
         minify: true,
         sourcemap: true,
         format: 'esm'
-    }).catch(() => process.exit(1));
-
-    esbuild.build({
-        entryPoints: ['./src/sidepanel/index.tsx'],
-        outfile: 'dist/sidepanel/index.js',
-        bundle: true,
-        minify: true,
-        sourcemap: true,
-        target: ['chrome58', 'firefox57'],
-        loader: { '.ts': 'ts', '.tsx': 'tsx' },
-        define: {
-          'process.env.NODE_ENV': '"production"'
-        },
     }).catch(() => process.exit(1));
 
     esbuild.build({
@@ -99,14 +85,6 @@ const build = () => {
         }
     });
 
-
-     // Copy sidepanel assets
-     ensureDirExists(path.join(distDir, 'sidepanel'));
-        fs.readdirSync(sidepanelDir).forEach(file => {
-            if (file.endsWith('.html') ) {
-                fs.copyFileSync(`${srcDir}/sidepanel/${file}`, `${distDir}/sidepanel/${file}`);
-            }
-        });
 
     // Copy settings assets
     const settingsDir = './src/settings';

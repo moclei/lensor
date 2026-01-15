@@ -1,4 +1,10 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo
+} from 'react';
 import { useLensorState } from '../../hooks/useLensorState';
 import { useDraggable } from '@/ui/hooks/useDraggable';
 import {
@@ -19,7 +25,6 @@ import { useDebugInfo, useDebugMode } from '@/ui/utils/debug-utils';
 import { useMediaCapture } from '@/ui/hooks/useMediaCapture';
 import { usePageObservers } from '@/ui/hooks/usePageObserver';
 import { useCanvasLifecycle } from '@/ui/hooks/useCanvasLifecycle';
-import { useInactivityTimeout } from '@/ui/hooks/useInactivityTimeout';
 import {
   convertToGrayscalePreservingFormat,
   hexToRgba,
@@ -47,18 +52,11 @@ const DRAWER_HALF_HEIGHT = DRAWER_HEIGHT / 2; // For vertical centering check on
 // Minimum time between captures (Chrome limits to 2/second, so 600ms is safe)
 const CAPTURE_COOLDOWN_MS = 600;
 
+// Minimum time between inactivity timer resets (prevents excessive alarm API calls)
+const ACTIVITY_RESET_DEBOUNCE_MS = 10000; // 10 seconds
+
 // Module-level state for drawer - persists across component remounts during capture
 let persistedDrawerOpen = false;
-
-// Get the shutdown function from the global scope (set by ui/index.tsx)
-const shutdownLensor = (): void => {
-  const shutdown = (window as any).__lensorShutdown;
-  if (typeof shutdown === 'function') {
-    shutdown();
-  } else {
-    log('Shutdown function not available');
-  }
-};
 
 interface LenseProps {
   onStop: () => void;
@@ -141,18 +139,44 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const { debugMode } = useDebugMode();
   const { debugInfo, setDebugInfo } = useDebugInfo();
 
-  // Calculate inactivity timeout from settings (0 = disabled)
-  const inactivityTimeoutMs =
-    settings.inactivityTimeoutMinutes > 0
-      ? settings.inactivityTimeoutMinutes * 60 * 1000
-      : 0;
+  // Track last activity reset time to implement debouncing
+  const lastActivityResetRef = useRef<number>(0);
+  const activityResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
-  // Inactivity timeout - shuts down extension after period of no activity
-  const { resetActivity } = useInactivityTimeout({
-    timeoutMs: inactivityTimeoutMs,
-    onTimeout: shutdownLensor,
-    enabled: active && inactivityTimeoutMs > 0
-  });
+  // Reset inactivity timer - sends message to service worker to reset the alarm
+  // Debounced to prevent excessive alarm API calls during rapid interactions
+  const resetActivity = useCallback(() => {
+    const now = Date.now();
+    const timeSinceLastReset = now - lastActivityResetRef.current;
+
+    // If we haven't reset recently, do it immediately
+    if (timeSinceLastReset >= ACTIVITY_RESET_DEBOUNCE_MS) {
+      lastActivityResetRef.current = now;
+      chrome.runtime.sendMessage({ type: 'resetInactivityTimer' });
+      return;
+    }
+
+    // Otherwise, schedule a trailing reset if not already scheduled
+    if (!activityResetTimeoutRef.current) {
+      const delay = ACTIVITY_RESET_DEBOUNCE_MS - timeSinceLastReset;
+      activityResetTimeoutRef.current = setTimeout(() => {
+        lastActivityResetRef.current = Date.now();
+        chrome.runtime.sendMessage({ type: 'resetInactivityTimer' });
+        activityResetTimeoutRef.current = null;
+      }, delay);
+    }
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (activityResetTimeoutRef.current) {
+        clearTimeout(activityResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const {
     imageBitmap: currentImage,

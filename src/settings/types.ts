@@ -49,9 +49,8 @@ export const DEFAULT_SETTINGS: LensorSettings = {
   drawerPalettes: ['monochromatic', 'material'], // Default: Harmony + Material
 
   // Behavior
-  inactivityTimeoutMinutes: 20,
+  inactivityTimeoutMinutes: 20
 };
 
 // Storage key for chrome.storage.sync
 export const SETTINGS_STORAGE_KEY = 'lensorSettings';
-

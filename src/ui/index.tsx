@@ -72,31 +72,8 @@ const crann = connect(LensorStateConfig, {
   debug: false
 });
 const { useCrann, onReady } = crann;
-const [_active, setActive, onActive] = useCrann('active');
+const [_active, _setActive, onActive] = useCrann('active');
 const [initialized, setInitialized] = useCrann('initialized');
-const [_isSidepanelShown, setIsSidepanelShown] = useCrann('isSidepanelShown');
-
-/**
- * Gracefully shut down the extension.
- * This stops the screen capture (removing the recording indicator),
- * hides the UI, and closes the sidepanel.
- *
- * The extension can be restarted by clicking the extension icon again.
- */
-function shutdownLensor() {
-  log('Shutting down Lensor due to inactivity');
-
-  // Set active to false - this triggers MediaStream cleanup in useMediaCapture
-  setActive(false);
-
-  // Close the sidepanel
-  setIsSidepanelShown(false);
-
-  // The visibility toggle will happen automatically via onActive subscription
-}
-
-// Export for use by Lense component
-(window as any).__lensorShutdown = shutdownLensor;
 
 onReady(() => {
   log('Crann ready');

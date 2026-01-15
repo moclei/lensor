@@ -42,17 +42,24 @@ Lensor operates across three independent JavaScript execution contexts, synchron
 
 ### Inactivity Timeout Flow
 
-To address the persistent screen recording indicator, the extension auto-shuts down after inactivity:
+The extension auto-shuts down after inactivity using Chrome Alarms API (service worker):
 
-1. `useInactivityTimeout` hook starts a 20-minute timer when extension activates
-2. Timer resets on user activity (drag lens, toggle controls, zoom, scroll page)
-3. Timer also resets when tab becomes visible again (user returns to tab)
-4. When timer expires:
-   - `active` state is set to `false`
-   - `useMediaCapture` cleanup runs, calling `track.stop()` on MediaStream
-   - Chrome's recording indicator disappears
-   - UI becomes hidden
-5. User can restart by clicking the extension icon (existing flow handles this)
+1. When `active` becomes `true`, service worker creates a Chrome alarm for that tab
+2. User activity in the UI sends `resetInactivityTimer` message to service worker
+3. Service worker recreates the alarm, resetting the countdown
+4. When alarm fires:
+   - Service worker looks up the agent for that tab via `getAgentStateByTabId()`
+   - Sets `active: false` via Crann state
+   - UI receives state change and hides
+5. User can restart by clicking the extension icon
+
+**Activity signals** (reset the timer):
+
+- Dragging the lens
+- Toggling grid/fisheye
+- Changing zoom
+- Opening/closing drawer
+- Page scroll/resize (triggers recapture)
 
 ### State Management (Crann)
 
@@ -110,6 +117,7 @@ A slide-out drawer UI attached to the lens provides quick access to settings:
 A dedicated extension page (`chrome-extension://xxx/settings/settings.html`) with tabbed UI:
 
 **Settings Tab:**
+
 - Default zoom, grid, fisheye states
 - Animation and flash effect toggles
 - Handle texture and opacity controls
@@ -118,6 +126,7 @@ A dedicated extension page (`chrome-extension://xxx/settings/settings.html`) wit
 - Live preview pane with real WebGL fisheye
 
 **Saved Colors Tab:**
+
 - View all saved colors with palettes
 - Editable labels for organization
 - Copy any color to clipboard
@@ -155,10 +164,8 @@ src/
 │   │   ├── useColorDetection.ts  # Color picking & palette generation
 │   │   ├── useGrid.ts            # Grid overlay drawing
 │   │   ├── usePageObserver.ts    # Scroll/resize/mutation detection
-│   │   ├── useInactivityTimeout.ts # Auto-shutdown after inactivity
 │   │   └── useLensorState.ts     # Crann hook wrapper
 │   └── utils/               # Color, coordinate, debug utilities
-├── sidepanel/               # DEPRECATED — Chrome sidepanel (replaced by slide drawer)
 ├── lib/                     # WebGL fisheye implementation
 │   ├── fisheyegl.ts
 │   └── shaders/             # GLSL shaders
@@ -169,15 +176,15 @@ src/
 
 ## Tech Stack
 
-| Category       | Technology                         |
-| -------------- | ---------------------------------- |
-| Language       | TypeScript                         |
-| UI Framework   | React 18                           |
-| Styling        | styled-components                  |
-| State Sync     | Crann (custom library)             |
-| Build Tool     | esbuild                            |
-| Extension APIs | Manifest V3, tabCapture            |
-| Graphics       | Canvas 2D, WebGL (fisheye)         |
+| Category       | Technology                 |
+| -------------- | -------------------------- |
+| Language       | TypeScript                 |
+| UI Framework   | React 18                   |
+| Styling        | styled-components          |
+| State Sync     | Crann (custom library)     |
+| Build Tool     | esbuild                    |
+| Extension APIs | Manifest V3, tabCapture    |
+| Graphics       | Canvas 2D, WebGL (fisheye) |
 
 ## Dependencies
 
@@ -235,22 +242,17 @@ Settings page and saved colors feature:
 - **Screen sharing indicator**: Chrome shows recording icon while `MediaStream` is active. Mitigated by the inactivity timeout feature which stops the stream after 20 minutes of no user interaction. User can restart by clicking the extension icon.
 - **Recapture flicker**: During recapture, the lens hides/shows with some flickering. See IDEAS.md for planned animation improvements.
 
-## Cleanup Required
-
-- **Sidepanel removal**: The `src/sidepanel/` directory and related manifest/build references should be removed. The sidepanel has been replaced by the slide drawer UI integrated into the main lens component.
-
 ## Documentation
 
 Technical documentation lives in `docs/`:
 
-| Path | Purpose |
-|------|---------|
-| `docs/animation/` | Animation implementation references |
+| Path                                   | Purpose                                  |
+| -------------------------------------- | ---------------------------------------- |
+| `docs/animation/`                      | Animation implementation references      |
 | `docs/animation/stacking_inventory.md` | UI element layering and visibility audit |
 
 ## Ignored Directories
 
 - `scratch/` — Experimental scripts, not part of the project
 - `src/devtools/` — Abandoned devtools panel attempt
-- `src/sidepanel/` — Deprecated sidepanel (to be removed)
 - `.prompts/` — Legacy AI prompt documentation (superseded by `.context/`)

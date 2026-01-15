@@ -15,8 +15,7 @@
       "@ui/*": ["ui/*"],
       "@features/*": ["ui/features/*"],
       "@utils/*": ["ui/utils/*"],
-      "@hooks/*": ["ui/hook/*"],
-      "@sidepanel/*": ["sidepanel/*"]
+      "@hooks/*": ["ui/hook/*"]
     },
     "outDir": "dist",
     "sourceMap": true,
