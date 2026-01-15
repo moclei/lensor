@@ -3,8 +3,65 @@ import { create, DerivedState } from 'crann';
 import { LensorStateConfig } from '../ui/state-config';
 import { PorterContext } from 'porter-source';
 import { debug } from '../lib/debug';
+import {
+  LensorSettings,
+  DEFAULT_SETTINGS,
+  SETTINGS_STORAGE_KEY
+} from '../settings/types';
 
 const log = debug.sw;
+
+// Alarm name prefix for inactivity timeouts
+const INACTIVITY_ALARM_PREFIX = 'inactivity-';
+
+// Throttle alarm resets - minimum time between resets for the same tab
+const ALARM_RESET_COOLDOWN_MS = 30000; // 30 seconds
+const lastAlarmResetTime: Record<number, number> = {};
+
+/**
+ * Get the inactivity timeout setting from storage
+ */
+async function getInactivityTimeoutMinutes(): Promise<number> {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get([SETTINGS_STORAGE_KEY], (result) => {
+      if (result[SETTINGS_STORAGE_KEY]) {
+        const settings: LensorSettings = {
+          ...DEFAULT_SETTINGS,
+          ...result[SETTINGS_STORAGE_KEY]
+        };
+        resolve(settings.inactivityTimeoutMinutes);
+      } else {
+        resolve(DEFAULT_SETTINGS.inactivityTimeoutMinutes);
+      }
+    });
+  });
+}
+
+/**
+ * Create or reset the inactivity alarm for a tab
+ */
+async function createInactivityAlarm(tabId: number): Promise<void> {
+  const timeoutMinutes = await getInactivityTimeoutMinutes();
+
+  // Timeout disabled - don't create alarm
+  if (timeoutMinutes <= 0) {
+    return;
+  }
+
+  const alarmName = `${INACTIVITY_ALARM_PREFIX}${tabId}`;
+
+  // Clear any existing alarm first, then create new one
+  await chrome.alarms.clear(alarmName);
+  await chrome.alarms.create(alarmName, { delayInMinutes: timeoutMinutes });
+}
+
+/**
+ * Clear the inactivity alarm for a tab
+ */
+async function clearInactivityAlarm(tabId: number): Promise<void> {
+  const alarmName = `${INACTIVITY_ALARM_PREFIX}${tabId}`;
+  await chrome.alarms.clear(alarmName);
+}
 
 log(
   'Service worker created, version: %s',
@@ -41,31 +98,20 @@ async function handleActionButtonClick(tab: chrome.tabs.Tab) {
 }
 
 subscribe((state, changes, agentInfo) => {
-  // Only need agentInfo.location.tabId for sidepanel/initialized handling
-  // Service-partitioned state changes and sidepanel agents won't have tabId
   const hasTabId = agentInfo?.location?.tabId;
 
-  if ('isSidepanelShown' in changes) {
-    if (!hasTabId) {
-      log('isSidepanelShown changed but no tabId available');
-      return;
-    }
-    log('isSidepanelShown changed: %s', changes.isSidepanelShown);
-    if (changes.isSidepanelShown === true) {
-      log('Opening sidepanel');
-      chrome.sidePanel.setOptions({
-        tabId: agentInfo.location.tabId,
-        path: 'sidepanel/sidepanel.html',
-        enabled: true
-      });
-      chrome.sidePanel.open({ tabId: agentInfo.location.tabId });
-    } else {
-      chrome.sidePanel.setOptions({
-        tabId: agentInfo.location.tabId,
-        enabled: false
-      });
+  // Handle active state changes - manage inactivity alarms
+  if ('active' in changes && hasTabId) {
+    const tabId = agentInfo!.location.tabId;
+    if (changes.active === true) {
+      // Extension activated - start inactivity alarm
+      createInactivityAlarm(tabId);
+    } else if (changes.active === false) {
+      // Extension deactivated - clear inactivity alarm
+      clearInactivityAlarm(tabId);
     }
   }
+
   if ('initialized' in changes) {
     if (!hasTabId) {
       log('initialized changed but no tabId available');
@@ -73,15 +119,20 @@ subscribe((state, changes, agentInfo) => {
     }
     log('Initialized changed: %s', changes.initialized);
     if (changes.initialized === true) {
-      log('Activating UI');
       const { key, state } = getAgentStateByTabId(agentInfo!.location.tabId);
       if (!key) {
         console.warn('[SW] No key found for tabId', agentInfo!.location.tabId);
         return;
       }
       const { active: isActive } = get(key);
-      log('Toggling active state to: %s', !isActive);
-      set({ active: !isActive }, key);
+      // Only activate if not already active - never toggle
+      // This prevents re-opening after the user closes the extension
+      if (!isActive) {
+        log('Activating UI (was inactive)');
+        set({ active: true }, key);
+      } else {
+        log('UI already active, skipping activation');
+      }
     }
   }
 });
@@ -94,79 +145,66 @@ async function injectContentScript(tabId: number) {
   });
 }
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (
-    changeInfo.status == 'complete' &&
-    tab.status == 'complete' &&
-    tab.url != undefined
-  ) {
-    const { key, state } = getAgentStateByTabId(tabId);
-    log('Tab updated, agent state: %o', { key, hasState: !!state });
-    if (state?.isSidepanelShown) {
-      await chrome.sidePanel.setOptions({
-        tabId,
-        path: 'sidepanel/sidepanel.html',
-        enabled: true
-      });
-    } else {
-      await chrome.sidePanel.setOptions({
-        tabId,
-        enabled: false
-      });
-    }
-  }
-});
-
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-  log('Tab activated: %o', activeInfo);
-
-  const { key, state } = getAgentStateByTabId(activeInfo.tabId);
-  log('Agent state for activated tab: %o', { key, hasState: !!state });
-
-  if (state?.isSidepanelShown) {
-    chrome.sidePanel.setOptions({
-      tabId: activeInfo.tabId,
-      path: 'sidepanel/sidepanel.html',
-      enabled: true
-    });
-  } else {
-    chrome.sidePanel.setOptions({
-      tabId: activeInfo.tabId,
-      enabled: false
-    });
-  }
-});
-
-chrome.runtime.onMessage.addListener(async (message) => {
-  log('Message received: %o', message);
-  
+chrome.runtime.onMessage.addListener(async (message, sender) => {
   if (message.type === 'openSettings') {
     log('Opening settings page');
     chrome.tabs.create({
       url: chrome.runtime.getURL('settings/settings.html')
     });
   }
+
+  if (message.type === 'resetInactivityTimer') {
+    const tabId = sender.tab?.id;
+    if (!tabId) return;
+
+    // Throttle: Skip if we just reset this tab's alarm recently
+    const now = Date.now();
+    const lastReset = lastAlarmResetTime[tabId] || 0;
+    if (now - lastReset < ALARM_RESET_COOLDOWN_MS) {
+      return;
+    }
+
+    lastAlarmResetTime[tabId] = now;
+    await createInactivityAlarm(tabId);
+  }
+});
+
+// Handle inactivity alarm - close extension when timeout expires
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (!alarm.name.startsWith(INACTIVITY_ALARM_PREFIX)) {
+    return;
+  }
+
+  const tabId = parseInt(alarm.name.replace(INACTIVITY_ALARM_PREFIX, ''), 10);
+  const { key, state } = getAgentStateByTabId(tabId);
+
+  if (key && state?.active) {
+    log('Inactivity timeout - closing extension on tab %d', tabId);
+    set({ active: false }, key);
+  }
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  log('Chrome started, initializing extension');
+  console.log('[Lensor Lifecycle] 🌅 Chrome started, initializing extension');
 });
 
 chrome.runtime.onSuspend.addListener(() => {
-  log('Unloading extension, saving state');
+  console.log('[Lensor Lifecycle] 💤 Service worker suspending...');
 });
 
 chrome.runtime.onSuspendCanceled.addListener(() => {
-  log('Extension unload canceled');
+  console.log(
+    '[Lensor Lifecycle] ⏰ Suspend canceled - service worker staying alive'
+  );
 });
 
 chrome.runtime.onUpdateAvailable.addListener((updateInfo) => {
-  log('Update available: %s', updateInfo.version);
+  console.log(`[Lensor Lifecycle] 📦 Update available: ${updateInfo.version}`);
 });
 
 chrome.runtime.onInstalled.addListener(
   async (details: chrome.runtime.InstalledDetails) => {
-    log('Extension installed/updated: %o', details);
+    console.log('[Lensor Lifecycle] 🎉 Extension installed/updated:', details);
   }
 );
 
