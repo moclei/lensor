@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useMemo
 } from 'react';
-import { useLensorState } from '../../hooks/useLensorState';
+import { useCrannState } from '../../hooks/useLensorState';
 import { useDraggable } from '@/ui/hooks/useDraggable';
 import {
   useColorDetection,
@@ -90,8 +90,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   // Load user settings
   const { settings, isLoading: settingsLoading } = useSettings();
 
-  const { useStateItem } = useLensorState();
-  const [lensePosition, setLensePosition] = useStateItem('lensePosition');
+  const [lensePosition, setLensePosition] = useCrannState('lensePosition');
 
   // Calculate initial position if at default (0,0)
   // Centered horizontally, positioned near top of viewport
@@ -106,6 +105,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
 
   // Save the initial position to state on first render if it was calculated
   useEffect(() => {
+    console.log('Lense.tsx initialized');
     if (lensePosition.x === 0 && lensePosition.y === 0) {
       const centeredX = (window.innerWidth - CANVAS_SIZE) / 2;
       const topY = window.innerHeight * 0.1; // 10% from top
@@ -113,18 +113,20 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     }
   }, []); // Only run once on mount
 
-  const [colorPalette, setColorPalette] = useStateItem('colorPalette');
-  const [materialPalette, setMaterialPalette] = useStateItem('materialPalette');
-  const [hoveredColor, setHoveredColor] = useStateItem('hoveredColor');
+  const [colorPalette, setColorPalette] = useCrannState('colorPalette');
+  const [materialPalette, setMaterialPalette] =
+    useCrannState('materialPalette');
+  const [hoveredColor, setHoveredColor] = useCrannState('hoveredColor');
 
-  const [gridOn, setGridOn] = useStateItem('showGrid');
-  const [fisheyeOn, setFisheyeOn] = useStateItem('showFisheye');
+  const [gridOn, setGridOn] = useCrannState('showGrid');
+  const [fisheyeOn, setFisheyeOn] = useCrannState('showFisheye');
   // autoRefresh is kept for potential future use but not exposed in UI
   // DOM mutation recapture is effectively disabled
-  const [zoom, setZoom] = useStateItem('zoom');
-  const [active] = useStateItem('active');
+  const [zoom, setZoom] = useCrannState('zoom');
+  const [active] = useCrannState('active');
 
   // Apply default settings from user preferences on first activation
+  // Note: Intentionally omitting setters from deps - they're stable and we use a ref guard
   useEffect(() => {
     if (active && !defaultsAppliedRef.current && !settingsLoading) {
       defaultsAppliedRef.current = true;
@@ -132,7 +134,8 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
       setGridOn(settings.defaultGrid);
       setFisheyeOn(settings.defaultFisheye);
     }
-  }, [active, settings, settingsLoading, setZoom, setGridOn, setFisheyeOn]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, settings, settingsLoading]);
 
   log('Render, active: %s', active);
 
@@ -409,11 +412,19 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   );
 
   // Don't render if extension is not active
-  if (!active) return;
+  if (!active) {
+    console.log('[Lense] Early return: active is false');
+    return null;
+  }
 
   // During initial capture (no image yet), don't render
   // During recaptures (we have an image), keep rendering with the previous image
-  if (isCapturing && !currentImage) return;
+  if (isCapturing && !currentImage) {
+    console.log('[Lense] Early return: isCapturing=true but no currentImage yet');
+    return null;
+  }
+  
+  console.log('[Lense] Rendering full component, active:', active, 'isCapturing:', isCapturing, 'hasImage:', !!currentImage);
 
   return (
     <LenseContainer ref={containerRef} initialPosition={initialPosition}>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
-import { useLensorState } from '../../hooks/useLensorState';
+import { useCrannState } from '../../hooks/useLensorState';
 import { useSettings } from '../../../settings/useSettings';
 
 const CANVAS_SIZE = 400;
@@ -130,9 +130,8 @@ const InnerPulse = styled.div<PulseRingProps>`
  * before the actual screenshot is taken, avoiding the flash appearing in the capture.
  */
 const CaptureFlash: React.FC = () => {
-  const { useStateItem } = useLensorState();
-  const [isFlashing] = useStateItem('isFlashing');
-  const [lensePosition] = useStateItem('lensePosition');
+  const [isFlashing] = useCrannState('isFlashing');
+  const [lensePosition] = useCrannState('lensePosition');
   const { settings } = useSettings();
   
   const [isAnimating, setIsAnimating] = useState(false);
