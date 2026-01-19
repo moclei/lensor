@@ -1,108 +1,95 @@
-import { Partition } from 'crann';
-import { BrowserLocation } from 'porter-source';
+import { createConfig, Scope } from 'crann';
 import { debug } from '../lib/debug';
 
 const log = debug.state;
 
-export const LensorStateConfig = {
+/**
+ * Lensor State Configuration (Crann v2)
+ *
+ * Uses Crann for state synchronization between service worker and content scripts.
+ *
+ * Scope types:
+ * - Scope.Agent: Per-tab state (scoped to each content script instance)
+ * - Scope.Shared: Global state (shared across all tabs)
+ */
+export const lensorConfig = createConfig({
+  name: 'lensor',
+
   active: {
     default: false,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   initialized: {
     default: false,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
-  // DEPRECATED: mediaStreamId is no longer used with captureVisibleTab approach
-  // Keeping for now in case we need to revert to MediaStream approach
-  // mediaStreamId: {
-  //   default: null as string | null,
-  //   partition: Partition.Instance
-  // },
   hoveredColor: {
     default: 'rgb(87, 102, 111)',
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   materialPalette: {
     default: {} as Record<number, string>,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   colorPalette: {
     default: [] as string[],
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   showGrid: {
     default: false,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   showFisheye: {
     default: false,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   autoRefresh: {
     default: false,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   zoom: {
     default: 3,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   captureCount: {
     default: 0,
-    partition: Partition.Service
+    scope: Scope.Shared
   },
   lensePosition: {
     default: { x: 0, y: 0 },
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   isCapturing: {
     default: false,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
   isFlashing: {
     default: false,
-    partition: Partition.Instance
+    scope: Scope.Agent
   },
-  // DEPRECATED: getMediaStreamId is no longer used with captureVisibleTab approach
-  // Keeping for now in case we need to revert to MediaStream approach
-  // getMediaStreamId: {
-  //   handler: async (
-  //     state: any,
-  //     setState: (newState: Partial<any>) => Promise<void>,
-  //     target: BrowserLocation
-  //   ) => {
-  //     log('Getting media stream ID for tab: %d', target.tabId);
-  //     const mediaStreamId = await (chrome.tabCapture as any).getMediaStreamId({
-  //       consumerTabId: target.tabId,
-  //       targetTabId: target.tabId
-  //     });
-  //     log('Media stream ID obtained');
-  //     return mediaStreamId;
-  //   },
-  //   validate: (amount: number) => {
-  //     if (amount < 0) throw new Error('Amount must be positive');
-  //   }
-  // },
-  // New action: Capture visible tab as a single screenshot (no video stream)
-  captureTab: {
-    handler: async (
-      state: any,
-      setState: (newState: Partial<any>) => Promise<void>,
-      target: BrowserLocation
-    ) => {
-      log('Capturing visible tab: %d', target.tabId);
 
-      // Get the window ID for this tab
-      const tab = await chrome.tabs.get(target.tabId);
-      const windowId = tab.windowId;
+  // Actions (RPC calls from content script to service worker)
+  actions: {
+    captureTab: {
+      handler: async (ctx) => {
+        const tabId = ctx.agentLocation.tabId;
+        log('Capturing visible tab: %d', tabId);
 
-      // Capture the visible area of the tab
-      const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
-        format: 'png'
-      });
+        // Get the window ID for this tab
+        const tab = await chrome.tabs.get(tabId);
+        const windowId = tab.windowId;
 
-      log('Tab captured, data URL length: %d', dataUrl.length);
-      return dataUrl;
+        // Capture the visible area of the tab
+        const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+          format: 'png'
+        });
+
+        log('Tab captured, data URL length: %d', dataUrl.length);
+        return dataUrl;
+      }
     }
   }
-};
+});
+
+// Export the config type for use in other files
+export type LensorConfig = typeof lensorConfig;

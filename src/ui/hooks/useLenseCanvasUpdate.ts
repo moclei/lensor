@@ -1,7 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import FisheyeGl, { Fisheye } from '../../lib/fisheyegl';
-import { DebugInfoProps } from '../utils/debug-utils';
-import { useLensorState } from './useLensorState';
 import { debug } from '../../lib/debug';
 
 const log = debug.canvas;

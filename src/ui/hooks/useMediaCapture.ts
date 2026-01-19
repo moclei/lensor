@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useLensorState } from './useLensorState';
+import { useCrannState, useCrannActions } from './useLensorState';
 import { debug } from '../../lib/debug';
 
 const log = debug.capture;
@@ -35,7 +35,6 @@ interface UseMediaCaptureResult {
 export function useMediaCapture(
   options: UseMediaCaptureOptions = {}
 ): UseMediaCaptureResult {
-  const { useStateItem, callAction } = useLensorState();
   const { autoCapture = true } = options;
 
   const [imageBitmap, setImageBitmap] = useState<ImageBitmap | null>(null);
@@ -43,14 +42,17 @@ export function useMediaCapture(
   const [error, setError] = useState<Error | null>(null);
 
   // Sync isCapturing to Crann state (for components that need to know capture is in progress)
-  const [, setIsCapturingState] = useStateItem('isCapturing');
+  const [, setIsCapturingState] = useCrannState('isCapturing');
   // Separate state for flash animation (triggers before capture to avoid flash in screenshot)
-  const [, setIsFlashing] = useStateItem('isFlashing');
+  const [, setIsFlashing] = useCrannState('isFlashing');
 
   // Track the current bitmap so we can close it when replaced
   const currentBitmapRef = useRef<ImageBitmap | null>(null);
 
-  const [active] = useStateItem('active');
+  const [active] = useCrannState('active');
+
+  // Get the captureTab action
+  const { captureTab } = useCrannActions();
 
   // Helper to set both local and shared state
   const setIsCapturing = (value: boolean) => {
@@ -89,7 +91,19 @@ export function useMediaCapture(
 
     try {
       // Call the service worker action to capture the tab
-      const dataUrl = await callAction('captureTab');
+      console.log('[useMediaCapture] About to call captureTab()');
+      let dataUrl;
+      try {
+        dataUrl = await captureTab();
+        console.log(
+          '[useMediaCapture] captureTab() returned:',
+          typeof dataUrl,
+          dataUrl ? `length: ${dataUrl.length}` : 'null/undefined'
+        );
+      } catch (rpcError) {
+        console.error('[useMediaCapture] captureTab() threw error:', rpcError);
+        throw rpcError;
+      }
 
       if (!dataUrl) {
         throw new Error('Failed to capture tab - no data URL returned');
@@ -100,11 +114,18 @@ export function useMediaCapture(
       // Convert data URL to ImageBitmap
       const rawBitmap = await dataUrlToImageBitmap(dataUrl);
 
-      log('Frame captured, dimensions: %dx%d', rawBitmap.width, rawBitmap.height);
+      log(
+        'Frame captured, dimensions: %dx%d',
+        rawBitmap.width,
+        rawBitmap.height
+      );
 
       // Calculate and crop black borders (letterboxing/pillarboxing)
       const cropMetrics = calculateImageBlackBorder(rawBitmap);
-      const processedBitmap = await cropImageBlackBorder(rawBitmap, cropMetrics);
+      const processedBitmap = await cropImageBlackBorder(
+        rawBitmap,
+        cropMetrics
+      );
 
       // Close the old bitmap before setting new one (prevent memory leak)
       if (currentBitmapRef.current) {
@@ -113,6 +134,12 @@ export function useMediaCapture(
 
       currentBitmapRef.current = processedBitmap;
       setImageBitmap(processedBitmap);
+      console.log(
+        '[useMediaCapture] Successfully set imageBitmap:',
+        processedBitmap.width,
+        'x',
+        processedBitmap.height
+      );
     } catch (error) {
       console.error('[useMediaCapture] Error capturing frame:', error);
       setError(
@@ -123,7 +150,7 @@ export function useMediaCapture(
     } finally {
       setIsCapturing(false);
     }
-  }, [callAction, setIsFlashing]);
+  }, [captureTab, setIsFlashing]);
 
   // Auto-capture when active becomes true
   useEffect(() => {

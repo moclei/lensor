@@ -1,7 +1,7 @@
-import { create, DerivedState } from 'crann';
-
-import { LensorStateConfig } from '../ui/state-config';
+import { createStore } from 'crann';
 import { PorterContext } from 'porter-source';
+
+import { lensorConfig } from '../ui/state-config';
 import { debug } from '../lib/debug';
 import {
   LensorSettings,
@@ -68,71 +68,82 @@ log(
   chrome.runtime.getManifest().version
 );
 
-// Set up state with crann
-const { get, set, subscribe, queryAgents, onInstanceReady } = create(
-  LensorStateConfig,
-  {
-    debug: false
-  }
-);
+// Enable debug logging in development builds only
+const IS_DEV = process.env.NODE_ENV === 'development';
+
+// Set up state with Crann v2
+const store = createStore(lensorConfig, {
+  debug: IS_DEV
+});
 
 async function handleActionButtonClick(tab: chrome.tabs.Tab) {
   log('Action button clicked on tab: %o', tab);
   if (!tab.id) return;
 
-  const { key, state } = getAgentStateByTabId(tab.id);
+  const agents = store.getAgents({
+    context: PorterContext.ContentScript,
+    tabId: tab.id
+  });
 
-  if (key && state) {
-    log('Found existing agent for tab: %o', { key, state });
-    const { active: isActive } = get(key);
+  if (agents.length > 0) {
+    const agent = agents[0];
+    log('Found existing agent for tab: %o', agent);
+    const agentState = store.getAgentState(agent.id);
+    const isActive = agentState.active;
     log('Toggling active state to: %s', !isActive);
-    set({ active: !isActive }, key);
-  }
-  if (!key || !state) {
+    await store.setState({ active: !isActive }, agent.id);
+  } else {
     console.warn('[SW] Action button clicked but no agent found for tab', {
-      key,
-      state
+      tabId: tab.id
     });
     await injectContentScript(tab.id);
   }
 }
 
-subscribe((state, changes, agentInfo) => {
-  const hasTabId = agentInfo?.location?.tabId;
+// Subscribe to 'active' changes - manage inactivity alarms
+store.subscribe(['active'], (state, changes, agentInfo) => {
+  const tabId = agentInfo?.location?.tabId;
+  if (tabId === undefined) return;
 
-  // Handle active state changes - manage inactivity alarms
-  if ('active' in changes && hasTabId) {
-    const tabId = agentInfo!.location.tabId;
-    if (changes.active === true) {
-      // Extension activated - start inactivity alarm
-      createInactivityAlarm(tabId);
-    } else if (changes.active === false) {
-      // Extension deactivated - clear inactivity alarm
-      clearInactivityAlarm(tabId);
-    }
+  if (changes.active === true) {
+    // Extension activated - start inactivity alarm
+    createInactivityAlarm(tabId);
+  } else if (changes.active === false) {
+    // Extension deactivated - clear inactivity alarm
+    clearInactivityAlarm(tabId);
+  }
+});
+
+// Subscribe to 'initialized' changes - auto-activate UI when content script connects
+store.subscribe(['initialized'], (state, changes, agentInfo) => {
+  const tabId = agentInfo?.location?.tabId;
+
+  console.log('[SW] Initialized change detected:', changes.initialized);
+  if (tabId === undefined) {
+    log('initialized changed but no tabId available');
+    return;
   }
 
-  if ('initialized' in changes) {
-    if (!hasTabId) {
-      log('initialized changed but no tabId available');
+  log('Initialized changed: %s', changes.initialized);
+  if (changes.initialized === true) {
+    const agents = store.getAgents({
+      context: PorterContext.ContentScript,
+      tabId
+    });
+    if (agents.length === 0) {
+      console.warn('[SW] No agent found for tabId', tabId);
       return;
     }
-    log('Initialized changed: %s', changes.initialized);
-    if (changes.initialized === true) {
-      const { key, state } = getAgentStateByTabId(agentInfo!.location.tabId);
-      if (!key) {
-        console.warn('[SW] No key found for tabId', agentInfo!.location.tabId);
-        return;
-      }
-      const { active: isActive } = get(key);
-      // Only activate if not already active - never toggle
-      // This prevents re-opening after the user closes the extension
-      if (!isActive) {
-        log('Activating UI (was inactive)');
-        set({ active: true }, key);
-      } else {
-        log('UI already active, skipping activation');
-      }
+    const agent = agents[0];
+    const agentState = store.getAgentState(agent.id);
+    const isActive = agentState.active;
+    // Only activate if not already active - never toggle
+    // This prevents re-opening after the user closes the extension
+    if (!isActive) {
+      log('Activating UI (was inactive)');
+      store.setState({ active: true }, agent.id);
+    } else {
+      log('UI already active, skipping activation');
     }
   }
 });
@@ -176,53 +187,43 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 
   const tabId = parseInt(alarm.name.replace(INACTIVITY_ALARM_PREFIX, ''), 10);
-  const { key, state } = getAgentStateByTabId(tabId);
-
-  if (key && state?.active) {
-    log('Inactivity timeout - closing extension on tab %d', tabId);
-    set({ active: false }, key);
-  }
-});
-
-chrome.runtime.onStartup.addListener(() => {
-  console.log('[Lensor Lifecycle] 🌅 Chrome started, initializing extension');
-});
-
-chrome.runtime.onSuspend.addListener(() => {
-  console.log('[Lensor Lifecycle] 💤 Service worker suspending...');
-});
-
-chrome.runtime.onSuspendCanceled.addListener(() => {
-  console.log(
-    '[Lensor Lifecycle] ⏰ Suspend canceled - service worker staying alive'
-  );
-});
-
-chrome.runtime.onUpdateAvailable.addListener((updateInfo) => {
-  console.log(`[Lensor Lifecycle] 📦 Update available: ${updateInfo.version}`);
-});
-
-chrome.runtime.onInstalled.addListener(
-  async (details: chrome.runtime.InstalledDetails) => {
-    console.log('[Lensor Lifecycle] 🎉 Extension installed/updated:', details);
-  }
-);
-
-chrome.action.onClicked.addListener(handleActionButtonClick);
-
-function getAgentStateByTabId(tabId: number): {
-  key: string | undefined;
-  state: DerivedState<typeof LensorStateConfig> | undefined;
-} {
-  const agents = queryAgents({
+  const agents = store.getAgents({
     context: PorterContext.ContentScript,
-    tabId: tabId
+    tabId
   });
 
-  if (!agents || agents.length === 0) {
-    return { key: undefined, state: undefined };
+  if (agents.length > 0) {
+    const agent = agents[0];
+    const agentState = store.getAgentState(agent.id);
+    if (agentState.active) {
+      log('Inactivity timeout - closing extension on tab %d', tabId);
+      await store.setState({ active: false }, agent.id);
+    }
   }
-  const key = agents[0].info.id;
-  const state = get(key);
-  return { key, state };
-}
+});
+
+// chrome.runtime.onStartup.addListener(() => {
+//   console.log('[Lensor Lifecycle] 🌅 Chrome started, initializing extension');
+// });
+
+// chrome.runtime.onSuspend.addListener(() => {
+//   console.log('[Lensor Lifecycle] 💤 Service worker suspending...');
+// });
+
+// chrome.runtime.onSuspendCanceled.addListener(() => {
+//   console.log(
+//     '[Lensor Lifecycle] ⏰ Suspend canceled - service worker staying alive'
+//   );
+// });
+
+// chrome.runtime.onUpdateAvailable.addListener((updateInfo) => {
+//   console.log(`[Lensor Lifecycle] 📦 Update available: ${updateInfo.version}`);
+// });
+
+// chrome.runtime.onInstalled.addListener(
+//   async (details: chrome.runtime.InstalledDetails) => {
+//     console.log('[Lensor Lifecycle] 🎉 Extension installed/updated:', details);
+//   }
+// );
+
+chrome.action.onClicked.addListener(handleActionButtonClick);

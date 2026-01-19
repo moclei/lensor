@@ -28,7 +28,7 @@
     "@spissvinkel/simplex-noise": "^1.0.1",
     "@types/node": "^20.12.12",
     "chokidar": "^3.5.3",
-    "crann": "^1.0.45",
+    "crann": "^2.0.6",
     "debug": "^4.4.3",
     "esbuild": "^0.19.9",
     "fisheyegl": "^0.1.2",
