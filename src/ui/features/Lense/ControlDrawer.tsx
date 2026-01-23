@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { useCrannActions } from '@/ui/hooks/useLensorState';
 import {
   DrawerContainer,
   PullTab,
@@ -23,7 +24,13 @@ import {
   SaveColorButton,
   DrawerPosition
 } from './ControlDrawer.styles';
-import { parseRgbColor, rgbToHex, rgbToHsl, generateAnyPalette, getPaletteDisplayName } from '@/ui/utils/color-utils';
+import {
+  parseRgbColor,
+  rgbToHex,
+  rgbToHsl,
+  generateAnyPalette,
+  getPaletteDisplayName
+} from '@/ui/utils/color-utils';
 import { useSettings } from '../../../settings/useSettings';
 import { ColorCopyFormat, PaletteType } from '../../../settings/types';
 import { useSavedColors, colorToHex } from '../../../settings/savedColors';
@@ -42,8 +49,10 @@ function rgbStringToHex(rgbStr: string): string {
 // Helper to format color based on user preference
 function formatColor(rgbStr: string, format: ColorCopyFormat): string {
   // Parse the rgb string
-  let r = 0, g = 0, b = 0;
-  
+  let r = 0,
+    g = 0,
+    b = 0;
+
   if (rgbStr.startsWith('#')) {
     const hex = rgbStr.slice(1);
     r = parseInt(hex.slice(0, 2), 16);
@@ -124,10 +133,11 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
 
   // Generate palettes based on settings (with fallback to defaults)
   const displayPalettes = useMemo(() => {
-    const palettesToShow = settings.drawerPalettes?.length > 0 
-      ? settings.drawerPalettes 
-      : ['monochromatic', 'material'] as PaletteType[];
-    
+    const palettesToShow =
+      settings.drawerPalettes?.length > 0
+        ? settings.drawerPalettes
+        : (['monochromatic', 'material'] as PaletteType[]);
+
     return palettesToShow.map((paletteType: PaletteType) => ({
       type: paletteType,
       name: getPaletteDisplayName(paletteType),
@@ -157,27 +167,34 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
     }
   }, [zoom, onZoomChange]);
 
-  const copyToClipboard = useCallback(async (color: string) => {
-    try {
-      // Format color based on user preference
-      const formattedColor = formatColor(color, settings.colorCopyFormat);
-      await navigator.clipboard.writeText(formattedColor);
-      setCopyTooltip(formattedColor);
-      setTimeout(() => setCopyTooltip(null), 1500);
-    } catch (err) {
-      console.error('Failed to copy color:', err);
-    }
-  }, [settings.colorCopyFormat]);
+  const copyToClipboard = useCallback(
+    async (color: string) => {
+      try {
+        // Format color based on user preference
+        const formattedColor = formatColor(color, settings.colorCopyFormat);
+        await navigator.clipboard.writeText(formattedColor);
+        setCopyTooltip(formattedColor);
+        setTimeout(() => setCopyTooltip(null), 1500);
+      } catch (err) {
+        console.error('Failed to copy color:', err);
+      }
+    },
+    [settings.colorCopyFormat]
+  );
 
-  const openSettings = useCallback(() => {
-    chrome.runtime.sendMessage({ type: 'openSettings' });
-  }, []);
+  // Get the openSettings action from Crann
+  const { openSettings } = useCrannActions();
 
   // Convert hovered color to hex for display
   const hexColor = rgbStringToHex(hoveredColor);
 
   return (
-    <DrawerContainer canvasSize={canvasSize} position={position} visible={visible} style={style}>
+    <DrawerContainer
+      canvasSize={canvasSize}
+      position={position}
+      visible={visible}
+      style={style}
+    >
       {/* Pull tab */}
       <PullTab
         accentColor={accentColor}
@@ -215,7 +232,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
               {isColorSaved ? '♥' : '♡'}
             </SaveColorButton>
             <SettingsButton
-              onClick={openSettings}
+              onClick={() => openSettings()}
               title="Open settings"
             >
               ⚙
@@ -283,7 +300,7 @@ export const ControlDrawer: React.FC<ControlDrawerProps> = ({
       {copyTooltip && (
         <CopyTooltip visible={!!copyTooltip}>Copied {copyTooltip}</CopyTooltip>
       )}
-      
+
       {/* Save tooltip */}
       {saveTooltip && (
         <CopyTooltip visible={!!saveTooltip}>{saveTooltip}</CopyTooltip>

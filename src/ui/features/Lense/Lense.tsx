@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useMemo
 } from 'react';
-import { useCrannState } from '../../hooks/useLensorState';
+import { useCrannState, useCrannActions } from '../../hooks/useLensorState';
 import { useDraggable } from '@/ui/hooks/useDraggable';
 import {
   useColorDetection,
@@ -142,13 +142,16 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
   const { debugMode } = useDebugMode();
   const { debugInfo, setDebugInfo } = useDebugInfo();
 
+  // Get the resetInactivityTimer action from Crann
+  const { resetInactivityTimer } = useCrannActions();
+
   // Track last activity reset time to implement debouncing
   const lastActivityResetRef = useRef<number>(0);
   const activityResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
 
-  // Reset inactivity timer - sends message to service worker to reset the alarm
+  // Reset inactivity timer - calls service worker action to reset the alarm
   // Debounced to prevent excessive alarm API calls during rapid interactions
   const resetActivity = useCallback(() => {
     const now = Date.now();
@@ -157,7 +160,7 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
     // If we haven't reset recently, do it immediately
     if (timeSinceLastReset >= ACTIVITY_RESET_DEBOUNCE_MS) {
       lastActivityResetRef.current = now;
-      chrome.runtime.sendMessage({ type: 'resetInactivityTimer' });
+      resetInactivityTimer();
       return;
     }
 
@@ -166,11 +169,11 @@ const Lense: React.FC<LenseProps> = ({ onStop, onClose }) => {
       const delay = ACTIVITY_RESET_DEBOUNCE_MS - timeSinceLastReset;
       activityResetTimeoutRef.current = setTimeout(() => {
         lastActivityResetRef.current = Date.now();
-        chrome.runtime.sendMessage({ type: 'resetInactivityTimer' });
+        resetInactivityTimer();
         activityResetTimeoutRef.current = null;
       }, delay);
     }
-  }, []);
+  }, [resetInactivityTimer]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
