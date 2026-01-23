@@ -1,5 +1,6 @@
 import { createConfig, Scope } from 'crann';
 import { debug } from '../lib/debug';
+import { resetInactivityTimer } from '../lib/inactivity-alarm';
 
 const log = debug.state;
 
@@ -86,6 +87,21 @@ export const lensorConfig = createConfig({
 
         log('Tab captured, data URL length: %d', dataUrl.length);
         return dataUrl;
+      }
+    },
+
+    openSettings: {
+      handler: async () => {
+        log('Opening settings page');
+        chrome.tabs.create({
+          url: chrome.runtime.getURL('settings/settings.html')
+        });
+      }
+    },
+
+    resetInactivityTimer: {
+      handler: async (ctx) => {
+        await resetInactivityTimer(ctx.agentLocation.tabId);
       }
     }
   }
